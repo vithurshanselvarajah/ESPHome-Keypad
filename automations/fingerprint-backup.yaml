@@ -103,23 +103,23 @@ automation:
           title: "Fingerprint Restore"
           message: "Slot {{ slot }} restored to all keypads."
 
-  # ----------------------------------------------------------------
-  # Backup ALL enrolled slots from a specific keypad
-  # Useful before replacing a sensor.
-  # ----------------------------------------------------------------
-  # To trigger: call the debug button "Backup All Enrolled Slots" from the
-  # device web UI (debug mode), or fire one backup per slot via a script:
-  #
-  # script:
-  #   backup_all_front_door:
-  #     sequence:
-  #       - repeat:
-  #           count: "{{ states('sensor.front_door_fingerprint_count') | int }}"
-  #           sequence:
-  #             - service: esphome.esphome_front_door_fingerprint_backup_slot
-  #               data:
-  #                 slot: "{{ repeat.index }}"
-  #             - delay: "00:00:02"
+# ----------------------------------------------------------------
+# Backup ALL enrolled slots from a specific keypad
+# Useful before replacing a sensor.
+# ----------------------------------------------------------------
+# To trigger: call the debug button "Backup All Enrolled Slots" from the
+# device web UI (debug mode), or fire one backup per slot via a script:
+#
+# script:
+#   backup_all_front_door:
+#     sequence:
+#       - repeat:
+#           count: "{{ states('sensor.front_door_fingerprint_count') | int }}"
+#           sequence:
+#             - service: esphome.esphome_front_door_fingerprint_backup_slot
+#               data:
+#                 slot: "{{ repeat.index }}"
+#             - delay: "00:00:02"
 
 # ----------------------------------------------------------------
 # Input helpers — one per slot, max 1024 chars for full template.
