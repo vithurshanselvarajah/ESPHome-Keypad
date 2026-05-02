@@ -1,0 +1,200 @@
+globals:
+  - id: saved_r
+    type: float
+    initial_value: "1.0"
+  - id: saved_g
+    type: float
+    initial_value: "1.0"
+  - id: saved_b
+    type: float
+    initial_value: "1.0"
+  - id: saved_bri
+    type: float
+    initial_value: "1.0"
+  - id: saved_on
+    type: bool
+    initial_value: "true"
+  - id: keypad_active
+    type: bool
+    initial_value: "false"
+
+script:
+  - id: keypad_restore_state
+    then:
+      - lambda: "id(keypad_active) = false;"
+      - if:
+          condition:
+            lambda: "return id(saved_on);"
+          then:
+            - light.turn_on:
+                id: status_light
+                red: !lambda "return id(saved_r);"
+                green: !lambda "return id(saved_g);"
+                blue: !lambda "return id(saved_b);"
+                brightness: !lambda "return id(saved_bri);"
+                transition_length: 0ms
+          else:
+            - light.turn_off:
+                id: status_light
+                transition_length: 0ms
+
+  - id: keypad_led_progress
+    parameters:
+      count: int
+    then:
+      - lambda: |-
+          auto *strip = static_cast<light::AddressableLight *>(id(status_light).get_output());
+          if (strip == nullptr) return;
+          int size = strip->size();
+
+          Color entry(20, 20, 255);
+          Color rest(0, 0, 0);
+          if (id(saved_on)) {
+            rest = Color(
+              (uint8_t)(id(saved_r)   * id(saved_bri) * 255.0f),
+              (uint8_t)(id(saved_g)   * id(saved_bri) * 255.0f),
+              (uint8_t)(id(saved_b)   * id(saved_bri) * 255.0f)
+            );
+          }
+
+          for (int i = 0; i < size; i++) {
+            (*strip)[i] = (i >= size - count) ? entry : rest;
+          }
+          strip->schedule_show();
+
+  - id: keypad_led_flash
+    then:
+      - light.turn_on:
+          id: status_light
+          brightness: 100%
+          red: 100%
+          green: 100%
+          blue: 100%
+          transition_length: 0ms
+      - delay: 300ms
+      - script.execute: keypad_restore_state
+
+  - id: keypad_led_result
+    then:
+      - light.turn_on:
+          id: status_light
+          brightness: 100%
+          red: 0%
+          green: 0%
+          blue: 100%
+          transition_length: 0ms
+      - delay: 150ms
+      - light.turn_off:
+          id: status_light
+          transition_length: 0ms
+      - delay: 150ms
+      - light.turn_on:
+          id: status_light
+          brightness: 100%
+          red: 0%
+          green: 0%
+          blue: 100%
+          transition_length: 0ms
+      - delay: 150ms
+      - light.turn_off:
+          id: status_light
+          transition_length: 0ms
+      - delay: 150ms
+      - light.turn_on:
+          id: status_light
+          brightness: 100%
+          red: 0%
+          green: 0%
+          blue: 100%
+          transition_length: 0ms
+      - delay: 150ms
+      - light.turn_off:
+          id: status_light
+          transition_length: 0ms
+      - delay: 2s
+      - script.execute: keypad_restore_state
+
+matrix_keypad:
+  id: mykeypad
+  rows:
+    - pin: 4
+    - pin: 5
+    - pin: 6
+    - pin: 7
+  columns:
+    - pin: 10
+    - pin: 11
+    - pin: 12
+  keys: "123456789*0#"
+  has_diodes: false
+
+binary_sensor:
+  - platform: matrix_keypad
+    keypad_id: mykeypad
+    id: key_clear
+    key: "*"
+    internal: true
+    on_press:
+      - script.execute: led_brightness_boost
+      - if:
+          condition:
+            lambda: "return id(keypad_active);"
+          then:
+            - script.execute: keypad_restore_state
+
+key_collector:
+  - id: pincode_reader
+    source_id: mykeypad
+    min_length: 4
+    max_length: 4
+    end_keys: "#"
+    end_key_required: true
+    clear_keys: "*"
+    allowed_keys: "0123456789"
+    timeout: 5s
+
+    on_progress:
+      - if:
+          condition:
+            or:
+              - api.connected:
+              - lambda: 'return id(debug_mode_enabled);'
+          then:
+            - script.execute: led_brightness_boost
+            - if:
+                condition:
+                  lambda: "return !id(keypad_active);"
+                then:
+                  - lambda: |-
+                      auto &v = id(status_light).current_values;
+                      id(saved_r)   = v.get_red();
+                      id(saved_g)   = v.get_green();
+                      id(saved_b)   = v.get_blue();
+                      id(saved_bri) = v.get_brightness();
+                      id(saved_on)  = v.is_on();
+                      id(keypad_active) = true;
+            - script.execute:
+                id: keypad_led_progress
+                count: !lambda "return (int)x.size();"
+
+    on_timeout:
+      - if:
+          condition:
+            lambda: "return id(keypad_active);"
+          then:
+            - script.execute: keypad_restore_state
+
+    on_result:
+      - if:
+          condition:
+            or:
+              - api.connected:
+              - lambda: 'return id(debug_mode_enabled);'
+          then:
+            - script.execute: led_brightness_boost
+            - script.execute: keypad_led_result
+            - homeassistant.event:
+                event: esphome.keypad_code_entered
+                data:
+                  code: !lambda "return std::string(x.begin(), x.end());"
+

@@ -1,0 +1,47 @@
+# yamllint configuration for automations/
+#
+# Only applied to the automations/ directory (HA YAML files).
+# ESPHome YAML files use custom tags (!secret, !include) that are not
+# standard YAML — those are validated by `esphome config` instead.
+
+extends: default
+
+rules:
+  # Long Jinja2 template lines are common in HA YAML
+  line-length:
+    max: 160
+    level: warning
+
+  # HA automation YAML uses 2-space indentation throughout
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Allow both quoted and unquoted truthy values used by HA
+  truthy:
+    allowed-values: ["true", "false", "yes", "no", "on", "off"]
+    check-keys: false
+
+  # Single space after # is fine; HA examples often use double space
+  comments:
+    min-spaces-from-content: 1
+
+  # Allow compact brace expressions common in Jinja2 filter chains
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    forbid-flow-sequences: false
+
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # Trailing newline required
+  new-line-at-end-of-file: enable
+
+  # No trailing spaces
+  trailing-spaces: enable
+
+  # Allow multiple documents in one file
+  document-start: disable

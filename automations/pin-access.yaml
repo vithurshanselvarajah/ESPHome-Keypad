@@ -1,0 +1,136 @@
+# PIN Access Automations
+#
+# Replace entity IDs, secrets, and device names to match your setup.
+#
+# USAGE:
+#   - Copy the relevant automation(s) into your HA configuration.yaml
+#     or a dedicated automations package file.
+#   - Store PINs in secrets.yaml — never hard-code them in automations.
+#
+# MULTI-KEYPAD:
+#   The trigger fires on ALL keypads. The condition blocks limit
+#   which keypad + PIN combination grants access to which lock.
+#   Add one automation block per keypad/door combination.
+#
+# secrets.yaml entries needed:
+#   front_door_pin: "1234"
+#   garage_pin: "5678"
+
+# ----------------------------------------------------------------
+# Front door keypad — PIN grants access
+# ----------------------------------------------------------------
+automation:
+  - alias: "Keypad: Front Door — PIN access"
+    id: keypad_front_door_pin_access
+    trigger:
+      - platform: event
+        event_type: esphome.keypad_code_entered
+        # Scope to the specific keypad by its ESPHome device name
+        # (the `device_name` substitution in keypad.yaml)
+        event_data:
+          # Remove this filter if you want ALL keypads to trigger this block,
+          # then use conditions to differentiate.
+          # If you set friendly_name, the context.id approach is more robust;
+          # prefer trigger.event.origin_entity_id scoped trigger (HA 2024.4+).
+    variables:
+      entered_code: "{{ trigger.event.data.code }}"
+      keypad_id: "esphome_front_door"   # matches device_name in keypad.yaml (underscores)
+    condition:
+      # Only handle this specific keypad's events
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.get('keypad_id', '') == keypad_id
+             or trigger.event.origin == 'esphome-front-door' }}
+    action:
+      - choose:
+          # Correct PIN
+          - conditions:
+              - condition: template
+                value_template: "{{ entered_code == states('input_text.front_door_pin') }}"
+            sequence:
+              - service: lock.unlock
+                target:
+                  entity_id: lock.front_door
+              - service: esphome.esphome_front_door_set_led_colour
+                data:
+                  hex: "00FF00"   # green = granted
+                  brightness: 100
+              - delay: "00:00:05"
+              - service: esphome.esphome_front_door_set_led_colour
+                data:
+                  hex: "FFFFFF"   # back to white
+                  brightness: "{{ states('number.front_door_led_brightness') | int }}"
+          # Wrong PIN
+          default:
+            - service: esphome.esphome_front_door_set_led_colour
+              data:
+                hex: "FF0000"   # red = denied
+                brightness: 100
+            - delay: "00:00:03"
+            - service: esphome.esphome_front_door_set_led_colour
+              data:
+                hex: "FFFFFF"
+                brightness: "{{ states('number.front_door_led_brightness') | int }}"
+
+  # ----------------------------------------------------------------
+  # Garage keypad — PIN grants access
+  # ----------------------------------------------------------------
+  - alias: "Keypad: Garage — PIN access"
+    id: keypad_garage_pin_access
+    trigger:
+      - platform: event
+        event_type: esphome.keypad_code_entered
+    variables:
+      entered_code: "{{ trigger.event.data.code }}"
+      keypad_id: "esphome_garage"
+    condition:
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.get('keypad_id', '') == keypad_id
+             or trigger.event.origin == 'esphome-garage' }}
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ entered_code == states('input_text.garage_pin') }}"
+            sequence:
+              - service: cover.open_cover
+                target:
+                  entity_id: cover.garage_door
+              - service: esphome.esphome_garage_set_led_colour
+                data:
+                  hex: "00FF00"
+                  brightness: 100
+              - delay: "00:00:05"
+              - service: esphome.esphome_garage_set_led_colour
+                data:
+                  hex: "FFFFFF"
+                  brightness: "{{ states('number.garage_led_brightness') | int }}"
+          default:
+            - service: esphome.esphome_garage_set_led_colour
+              data:
+                hex: "FF0000"
+                brightness: 100
+            - delay: "00:00:03"
+            - service: esphome.esphome_garage_set_led_colour
+              data:
+                hex: "FFFFFF"
+                brightness: "{{ states('number.garage_led_brightness') | int }}"
+
+# ----------------------------------------------------------------
+# Input helpers — store PINs outside automation YAML
+# Add to configuration.yaml or a helpers package file.
+# ----------------------------------------------------------------
+# input_text:
+#   front_door_pin:
+#     name: "Front Door PIN"
+#     mode: password   # hides value in UI
+#     initial: !secret front_door_pin
+#     min: 4
+#     max: 4
+#   garage_pin:
+#     name: "Garage PIN"
+#     mode: password
+#     initial: !secret garage_pin
+#     min: 4
+#     max: 4

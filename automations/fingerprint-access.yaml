@@ -1,0 +1,101 @@
+# Fingerprint Access Automations
+#
+# The `fingerprint_authenticated` event fires with:
+#   id:         slot number (string) of the matched template
+#   confidence: match score 0–255 (string)
+#
+# MULTI-KEYPAD:
+#   Use trigger.event.origin to scope to a specific keypad.
+#   Maintain a slot → person mapping via input_text helpers or
+#   a template sensor so you can identify who authenticated.
+#
+# SLOT → PERSON MAPPING (recommended approach):
+#   Create input_text.fp_slot_1_name, fp_slot_2_name, etc.
+#   or use a dictionary in a template sensor.
+
+automation:
+  # ----------------------------------------------------------------
+  # Front door — fingerprint grants access
+  # ----------------------------------------------------------------
+  - alias: "Keypad: Front Door — Fingerprint access"
+    id: keypad_front_door_fingerprint_access
+    trigger:
+      - platform: event
+        event_type: esphome.fingerprint_authenticated
+    variables:
+      slot: "{{ trigger.event.data.id }}"
+      confidence: "{{ trigger.event.data.confidence | int }}"
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.origin == 'esphome-front-door' }}"
+      # Reject low-confidence matches (tune threshold to your environment)
+      - condition: template
+        value_template: "{{ confidence >= 50 }}"
+    action:
+      - service: lock.unlock
+        target:
+          entity_id: lock.front_door
+      - service: esphome.esphome_front_door_set_led_colour
+        data:
+          hex: "00FF00"   # green = granted
+          brightness: 100
+      - service: notify.mobile_app_phone
+        data:
+          title: "Front Door"
+          message: >
+            Access granted — {{ states('input_text.fp_slot_' ~ slot ~ '_name') | default('Slot ' ~ slot) }}
+            (confidence {{ confidence }})
+      - delay: "00:00:05"
+      - service: esphome.esphome_front_door_set_led_colour
+        data:
+          hex: "FFFFFF"
+          brightness: "{{ states('number.front_door_led_brightness') | int }}"
+
+  # ----------------------------------------------------------------
+  # Garage — fingerprint grants access
+  # ----------------------------------------------------------------
+  - alias: "Keypad: Garage — Fingerprint access"
+    id: keypad_garage_fingerprint_access
+    trigger:
+      - platform: event
+        event_type: esphome.fingerprint_authenticated
+    variables:
+      slot: "{{ trigger.event.data.id }}"
+      confidence: "{{ trigger.event.data.confidence | int }}"
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.origin == 'esphome-garage' }}"
+      - condition: template
+        value_template: "{{ confidence >= 50 }}"
+    action:
+      - service: cover.open_cover
+        target:
+          entity_id: cover.garage_door
+      - service: esphome.esphome_garage_set_led_colour
+        data:
+          hex: "00FF00"
+          brightness: 100
+      - service: notify.mobile_app_phone
+        data:
+          title: "Garage"
+          message: >
+            Access granted — {{ states('input_text.fp_slot_' ~ slot ~ '_name') | default('Slot ' ~ slot) }}
+      - delay: "00:00:05"
+      - service: esphome.esphome_garage_set_led_colour
+        data:
+          hex: "FFFFFF"
+          brightness: "{{ states('number.garage_led_brightness') | int }}"
+
+# ----------------------------------------------------------------
+# Slot → person name helpers
+# Add to configuration.yaml or a helpers package file.
+# Set the value of each to the person's name.
+# ----------------------------------------------------------------
+# input_text:
+#   fp_slot_1_name:
+#     name: "Fingerprint: Slot 1 Name"
+#     initial: "Alice"
+#   fp_slot_2_name:
+#     name: "Fingerprint: Slot 2 Name"
+#     initial: "Bob"
+#   # ... add up to slot 200

@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop", "feature/**", "fix/**"]
+  pull_request:
+    branches: ["main", "develop"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+  lint:
+    name: Lint automations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Lint automation YAML
+        run: yamllint -c .yamllint.yml automations/
+
+  validate:
+    name: Validate ESPHome config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-esphome-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: ${{ runner.os }}-pip-esphome-
+
+      - name: Install ESPHome
+        run: pip install "esphome==2026.4.2"
+
+      - name: Generate CI secrets
+        run: python tests/generate_test_secrets.py
+
+      - name: Validate config
+        run: esphome config keypad.yaml
+
+  compile:
+    name: Compile firmware
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-esphome-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: ${{ runner.os }}-pip-esphome-
+
+      - name: Install ESPHome
+        run: pip install "esphome==2026.4.2"
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-${{ hashFiles('keypad.yaml', 'keypad/**/*.yaml', 'keypad/include/**') }}
+          restore-keys: ${{ runner.os }}-pio-
+
+      - name: Generate CI secrets
+        run: python tests/generate_test_secrets.py
+
+      - name: Compile firmware
+        run: esphome compile keypad.yaml
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ github.sha }}
+          path: .esphome/build/esphome-keypad/.pioenvs/esphome-keypad/firmware.bin
+          retention-days: 30
