@@ -81,7 +81,7 @@ jobs:
           restore-keys: ${{ runner.os }}-pip-esphome
 
       - name: Install ESPHome
-        run: pip install "esphome==2026.4.2"
+        run: pip install --upgrade esphome
 
       - name: Cache PlatformIO packages
         uses: actions/cache@v4
