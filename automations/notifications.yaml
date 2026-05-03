@@ -49,15 +49,6 @@ actions:
                 confidence {{ trigger.event.data.confidence }})
 mode: queued
 max: 5
-            target:
-              entity_id: counter.keypad_wrong_pin
-
-# ----------------------------------------------------------------
-# Counter helper for brute-force detection.
-# Add to configuration.yaml or a helpers package file.
-# ----------------------------------------------------------------
-# counter:
-#   keypad_wrong_pin:
 #     name: "Keypad Wrong PIN Count"
 #     initial: 0
 #     step: 1
