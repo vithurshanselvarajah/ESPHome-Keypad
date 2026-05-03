@@ -73,6 +73,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Persist main refs in keypad.yaml
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("keypad.yaml")
+          text = path.read_text(encoding="utf-8")
+          updated = text.replace("ref: develop", "ref: main")
+          if updated != text:
+            path.write_text(updated, encoding="utf-8")
+            print("keypad.yaml updated: ref develop -> main")
+          else:
+            print("keypad.yaml already using main refs")
+          PY
+
+          if ! git diff --quiet -- keypad.yaml; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add keypad.yaml
+            git commit -m "chore(release): set keypad refs to main"
+            git push origin HEAD:main
+          fi
+
+      - name: Sync workspace to latest main
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+
       - name: Cache pip
         uses: actions/cache@v4
         with:

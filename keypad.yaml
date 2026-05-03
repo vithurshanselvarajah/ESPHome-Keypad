@@ -16,15 +16,6 @@ substitutions:
 
   log_level: "DEBUG"
 
-external_components:
-  - source:
-      type: git
-      url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
-      ref: main
-      path: components
-    components: [fingerprint_backup]
-    refresh: 300s
-
 packages:
   # ── Local development ─────────────────────────────────────────────────
   # Uncomment when flashing directly from your workstation and comment
@@ -38,7 +29,7 @@ packages:
   # ── Remote source ──────────────────────────────────────
   remote_package:
     url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
-    ref: main
+    ref: develop
     refresh: 300s
     files:
       - keypad/board.yaml
@@ -46,3 +37,12 @@ packages:
       - keypad/fingerprint.yaml
       - keypad/keypad.yaml
       - keypad/status_light.yaml
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
+      ref: develop
+      path: components
+    components: [fingerprint_backup]
+    refresh: 300s
