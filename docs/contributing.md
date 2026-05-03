@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for contributing to this project. This document covers everything you need to develop, test, and submit changes.
+Thank you for contributing to this project. This document covers everything you need to build, test, and submit changes.
 
 ---
 
