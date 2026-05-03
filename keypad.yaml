@@ -14,7 +14,7 @@ substitutions:
   debug_mode: "0"
   api_reboot_timeout: "60s"
 
-  log_level: "DEBUG"
+  log_level: "ERROR"
 
 packages:
   # ── Local development ─────────────────────────────────────────────────
