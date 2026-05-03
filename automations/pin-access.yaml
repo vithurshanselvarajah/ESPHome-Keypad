@@ -1,136 +1,64 @@
-# PIN Access Automations
+# PIN — Alarm Toggle
 #
-# Replace entity IDs, secrets, and device names to match your setup.
+# HOW TO USE:
+#   Settings → Automations → New Automation → 3-dot menu → Edit in YAML
+#   Paste this block. Replace the two values marked REPLACE.
 #
-# USAGE:
-#   - Copy the relevant automation(s) into your HA configuration.yaml
-#     or a dedicated automations package file.
-#   - Store PINs in secrets.yaml — never hard-code them in automations.
+# CONCEPT:
+#   The LED colour acts as the alarm state indicator:
+#     Green  (#33FF00) = Armed
+#     Red    (#FF0000) = Disarmed
+#   Entering the correct PIN toggles between the two states.
+#   The keypad breathes in the current colour after each PIN entry,
+#   then HA sends the new colour to confirm the state change.
 #
-# MULTI-KEYPAD:
-#   The trigger fires on ALL keypads. The condition blocks limit
-#   which keypad + PIN combination grants access to which lock.
-#   Add one automation block per keypad/door combination.
+# ENTITY IDs TO REPLACE:
+#   - REPLACE_KEYPAD_DEVICE_ID  → your device_id from the event data
+#   - REPLACE_ACTION_PREFIX     → e.g. esphome_keypad_58066c
+#   - REPLACE_COLOUR_SENSOR     → e.g. sensor.keypad_58066c_led_colour_hex
 #
-# secrets.yaml entries needed:
-#   front_door_pin: "1234"
-#   garage_pin: "5678"
+# Find entity IDs: Settings → Developer Tools → Events
+# Listen to esphome.keypad_code_entered and press # on the keypad.
+# The device_id appears in the event data.
 
-# ----------------------------------------------------------------
-# Front door keypad — PIN grants access
-# ----------------------------------------------------------------
-automation:
-  - alias: "Keypad: Front Door — PIN access"
-    id: keypad_front_door_pin_access
-    trigger:
-      - platform: event
-        event_type: esphome.keypad_code_entered
-        # Scope to the specific keypad by its ESPHome device name
-        # (the `device_name` substitution in keypad.yaml)
-        # Remove this filter if you want ALL keypads to trigger this block,
-        # then use conditions to differentiate.
-        # If you set friendly_name, the context.id approach is more robust;
-        # prefer trigger.event.origin_entity_id scoped trigger (HA 2024.4+).
-        event_data:
-    variables:
-      entered_code: "{{ trigger.event.data.code }}"
-      keypad_id: "esphome_front_door"   # matches device_name in keypad.yaml (underscores)
-    condition:
-      # Only handle this specific keypad's events
-      - condition: template
-        value_template: >
-          {{ trigger.event.data.get('keypad_id', '') == keypad_id
-             or trigger.event.origin == 'esphome-front-door' }}
-    action:
-      - choose:
-          # Correct PIN
-          - conditions:
-              - condition: template
-                value_template: "{{ entered_code == states('input_text.front_door_pin') }}"
-            sequence:
-              - service: lock.unlock
-                target:
-                  entity_id: lock.front_door
-              - service: esphome.esphome_front_door_set_led_colour
-                data:
-                  hex: "00FF00"   # green = granted
-                  brightness: 100
-              - delay: "00:00:05"
-              - service: esphome.esphome_front_door_set_led_colour
-                data:
-                  hex: "FFFFFF"   # back to white
-                  brightness: "{{ states('number.front_door_led_brightness') | int }}"
-          # Wrong PIN
-        default:
-          - service: esphome.esphome_front_door_set_led_colour
-            data:
-              hex: "FF0000"   # red = denied
-              brightness: 100
-          - delay: "00:00:03"
-          - service: esphome.esphome_front_door_set_led_colour
-            data:
-              hex: "FFFFFF"
-              brightness: "{{ states('number.front_door_led_brightness') | int }}"
-
-  # ----------------------------------------------------------------
-  # Garage keypad — PIN grants access
-  # ----------------------------------------------------------------
-  - alias: "Keypad: Garage — PIN access"
-    id: keypad_garage_pin_access
-    trigger:
-      - platform: event
-        event_type: esphome.keypad_code_entered
-    variables:
-      entered_code: "{{ trigger.event.data.code }}"
-      keypad_id: "esphome_garage"
-    condition:
-      - condition: template
-        value_template: >
-          {{ trigger.event.data.get('keypad_id', '') == keypad_id
-             or trigger.event.origin == 'esphome-garage' }}
-    action:
-      - choose:
-          - conditions:
-              - condition: template
-                value_template: "{{ entered_code == states('input_text.garage_pin') }}"
-            sequence:
-              - service: cover.open_cover
-                target:
-                  entity_id: cover.garage_door
-              - service: esphome.esphome_garage_set_led_colour
-                data:
-                  hex: "00FF00"
-                  brightness: 100
-              - delay: "00:00:05"
-              - service: esphome.esphome_garage_set_led_colour
-                data:
-                  hex: "FFFFFF"
-                  brightness: "{{ states('number.garage_led_brightness') | int }}"
-        default:
-          - service: esphome.esphome_garage_set_led_colour
-            data:
-              hex: "FF0000"
-              brightness: 100
-          - delay: "00:00:03"
-          - service: esphome.esphome_garage_set_led_colour
-            data:
-              hex: "FFFFFF"
-              brightness: "{{ states('number.garage_led_brightness') | int }}"
-
-# ----------------------------------------------------------------
-# Input helpers — store PINs outside automation YAML
-# Add to configuration.yaml or a helpers package file.
-# ----------------------------------------------------------------
-# input_text:
-#   front_door_pin:
-#     name: "Front Door PIN"
-#     mode: password   # hides value in UI
-#     initial: !secret front_door_pin
-#     min: 4
-#     max: 4
-#   garage_pin:
-#     name: "Garage PIN"
-#     mode: password
-#     initial: !secret garage_pin
-#     min: 4
-#     max: 4
+alias: "Alarm: Toggle armed/disarmed via PIN"
+description: >
+  Correct PIN toggles alarm state. Green LED = armed, red LED = disarmed.
+  Replace the PIN in event_data with your own code.
+triggers:
+  - trigger: event
+    event_type: esphome.keypad_code_entered
+    event_data:
+      device_id: REPLACE_KEYPAD_DEVICE_ID
+      code: "1234"
+conditions: []
+actions:
+  - if:
+      - condition: state
+        entity_id: REPLACE_COLOUR_SENSOR
+        state: "#33FF00"
+    then:
+      - delay:
+          seconds: 2
+      - alias: "Disarm — set LED red"
+        action: esphome.REPLACE_ACTION_PREFIX_set_led_colour
+        data:
+          hex: "#FF0000"
+          brightness: 50
+      - alias: "Disarm the alarm"
+        action: alarm_control_panel.alarm_disarm
+        target:
+          entity_id: alarm_control_panel.home_alarm
+    else:
+      - delay:
+          seconds: 2
+      - alias: "Arm — set LED green"
+        action: esphome.REPLACE_ACTION_PREFIX_set_led_colour
+        data:
+          hex: "#33FF00"
+          brightness: 50
+      - alias: "Arm the alarm"
+        action: alarm_control_panel.alarm_arm_away
+        target:
+          entity_id: alarm_control_panel.home_alarm
+mode: single

@@ -1,100 +1,49 @@
-# Fingerprint Enrollment Automation
+# Fingerprint — Enroll next slot
 #
-# Enrollment is driven entirely from HA via the fingerprint_enroll action.
-# No physical buttons exist on the device for this.
+# HOW TO USE:
+#   Settings → Automations → New Automation → 3-dot menu → Edit in YAML
+#   Paste this block. Replace the values marked REPLACE.
 #
-# FLOW:
-#   1. Call fingerprint_enroll with a slot number and scan count.
-#   2. The aura LED goes purple — place finger on sensor.
-#   3. Lift after each blue flash. Repeat for all scans.
-#   4. Blue breathing = enrolled successfully.
-#   5. Fingerprint Count sensor increments.
+# ENROLLMENT FLOW:
+#   1. Fire the trigger event from Developer Tools → Events:
+#        event_type: keypad.enroll_fingerprint
+#   2. The automation calls fingerprint_enroll on the device.
+#   3. LED turns purple — place your finger on the sensor.
+#   4. Lift after each blue flash, repeat for each scan.
+#   5. Blue breathing = enrolled successfully.
 #
-# MULTI-KEYPAD — enroll on one, restore to others:
-#   After enrolling on keypad A, use fingerprint-backup.yaml to copy
-#   the template to all other keypads.
+# You can also call the action directly from Developer Tools → Actions:
+#   action: esphome.REPLACE_ACTION_PREFIX_fingerprint_enroll
+#   data:
+#     slot: 1
+#     num_scans: 3
+#
+# REPLACE:
+#   - REPLACE_ACTION_PREFIX  → e.g. esphome_keypad_58066c
+#   - REPLACE_FP_COUNT_SENSOR → e.g. sensor.keypad_58066c_fingerprint_count
+#   - notify.mobile_app_your_phone  → your actual notify target
 
-automation:
-  # ----------------------------------------------------------------
-  # Enroll the next available slot on the front door keypad
-  # Trigger via Developer Tools → Actions:
-  #   event_type: keypad.enroll_next_slot
-  #   event_data:
-  #     device: "front_door"
-  # ----------------------------------------------------------------
-  - alias: "Fingerprint: Enroll next slot"
-    id: fingerprint_enroll_next_slot
-    trigger:
-      - platform: event
-        event_type: keypad.enroll_next_slot
-    variables:
-      device: "{{ trigger.event.data.device }}"   # e.g. "front_door" or "garage"
-      count_entity: "sensor.{{ device }}_fingerprint_count"
-      next_slot: "{{ states(count_entity) | int + 1 }}"
-    condition:
-      - condition: template
-        value_template: "{{ next_slot <= 200 }}"
-    action:
-      - service: "esphome.esphome_{{ device }}_fingerprint_enroll"
-        data:
-          slot: "{{ next_slot | int }}"
-          num_scans: 3
-      - service: notify.mobile_app_phone
-        data:
-          title: "Fingerprint Enrollment"
-          message: >
-            Enrolling slot {{ next_slot }} on {{ device }}.
-            Place your finger on the sensor when the LED turns purple.
-
-  # ----------------------------------------------------------------
-  # Enroll a specific slot on a specific keypad
-  # ----------------------------------------------------------------
-  # Call directly from Developer Tools → Actions:
-  #
-  # Front door, slot 5, 3 scans:
-  #   service: esphome.esphome_front_door_fingerprint_enroll
-  #   data:
-  #     slot: 5
-  #     num_scans: 3
-  #
-  # Garage, slot 5, 3 scans:
-  #   service: esphome.esphome_garage_fingerprint_enroll
-  #   data:
-  #     slot: 5
-  #     num_scans: 3
-
-  # ----------------------------------------------------------------
-  # After enrollment — immediately back up and push to all keypads
-  # Trigger by listening for the count sensor to increment.
-  # ----------------------------------------------------------------
-  - alias: "Fingerprint: Auto-backup and distribute after enrollment"
-    id: fingerprint_auto_distribute
-    trigger:
-      # Fires when count increases on any keypad
-      - platform: state
-        entity_id:
-          - sensor.front_door_fingerprint_count
-          - sensor.garage_fingerprint_count
-    condition:
-      - condition: template
-        # Count increased (not a reset to 0)
-        value_template: >
-          {{ trigger.to_state.state | int > trigger.from_state.state | int }}
-    variables:
-      new_slot: "{{ trigger.to_state.state | int }}"
-      # Determine which keypad just enrolled
-      source_device: >
-        {% if 'front_door' in trigger.entity_id %}esphome_front_door
-        {% elif 'garage' in trigger.entity_id %}esphome_garage
-        {% else %}unknown{% endif %}
-    action:
-      # Back up the newly enrolled slot from the source keypad
-      - service: "esphome.{{ source_device }}_fingerprint_backup_slot"
-        data:
-          slot: "{{ new_slot }}"
-      # Wait for the backup event (captured by fingerprint-backup.yaml)
-      - delay: "00:00:03"
-      # Fire the cross-restore event (handled by fingerprint-backup.yaml)
-      - event: keypad.restore_slot_to_all
-        event_data:
-          slot: "{{ new_slot }}"
+alias: "Fingerprint: Enroll next available slot"
+description: >-
+  Fire keypad.enroll_fingerprint to enroll into the next free slot.
+triggers:
+  - trigger: event
+    event_type: keypad.enroll_fingerprint
+conditions:
+  - condition: template
+    value_template: "{{ states('REPLACE_FP_COUNT_SENSOR') | int < 200 }}"
+actions:
+  - variables:
+      next_slot: "{{ states('REPLACE_FP_COUNT_SENSOR') | int + 1 }}"
+  - alias: "Start enrollment on device"
+    action: esphome.REPLACE_ACTION_PREFIX_fingerprint_enroll
+    data:
+      slot: "{{ next_slot | int }}"
+      num_scans: 3
+  - action: notify.mobile_app_your_phone
+    data:
+      title: "Fingerprint Enrollment"
+      message: >
+        Enrolling slot {{ next_slot }}.
+        Place your finger on the sensor when the LED turns purple.
+mode: single

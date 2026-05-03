@@ -8,7 +8,7 @@ Thank you for contributing to this project. This document covers everything you 
 
 | Tool | Version | Purpose |
 |---|---|---|
-| Python | ≥ 3.12 | ESPHome CLI, test runner |
+| Python | ≥ 3.14 | ESPHome CLI, test runner |
 | ESPHome | 2026.4.2 | Config validation, firmware compile |
 | git | any | Version control |
 | pytest | any | Running unit tests |

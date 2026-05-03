@@ -76,6 +76,12 @@ api:
         hex: string
         brightness: int
       then:
+        - if:
+            condition:
+              lambda: "return id(result_active);"
+            then:
+              - script.stop: keypad_led_result
+              - lambda: "id(keypad_active) = false; id(result_active) = false;"
         - lambda: |-
             std::string h = hex;
             for (auto &c : h) c = tolower(c);
@@ -98,7 +104,11 @@ api:
             float rf = ri / 255.0f, gf = gi / 255.0f, bf = bi / 255.0f;
             id(saved_r) = rf; id(saved_g) = gf; id(saved_b) = bf;
             id(saved_bri) = bri; id(saved_on) = true;
-            if (id(keypad_active)) return;
+            // Publish hex colour to HA sensor
+            char buf[8];
+            snprintf(buf, sizeof(buf), "#%02X%02X%02X", ri, gi, bi);
+            id(led_colour_hex).publish_state(buf);
+            if (id(keypad_active)) return;  // blocked during progress LEDs (not result)
             auto call = id(status_light).turn_on();
             call.set_red(rf); call.set_green(gf); call.set_blue(bf);
             call.set_brightness(bri);
@@ -106,7 +116,7 @@ api:
             call.perform();
         - if:
             condition:
-              lambda: 'return brightness >= 1 && brightness <= 100 && !id(led_boost_active) && !id(keypad_active);'
+              lambda: 'return brightness >= 1 && brightness <= 100 && !id(led_boost_active) && !id(keypad_active) && !id(result_active);'
             then:
               - number.set:
                   id: led_brightness
@@ -138,6 +148,14 @@ api:
               green: 100%
               blue: 100%
               transition_length: 500ms
+          - lambda: |-
+              // Publish current saved colour as hex on reconnect
+              char buf[8];
+              int ri = (int)(id(saved_r) * 255.0f);
+              int gi = (int)(id(saved_g) * 255.0f);
+              int bi = (int)(id(saved_b) * 255.0f);
+              snprintf(buf, sizeof(buf), "#%02X%02X%02X", ri, gi, bi);
+              id(led_colour_hex).publish_state(buf);
 
 ota:
   - platform: esphome

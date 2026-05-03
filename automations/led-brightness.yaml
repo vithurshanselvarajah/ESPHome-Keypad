@@ -1,83 +1,29 @@
-# LED Brightness Automations
+# LED — Night Mode (dim at scheduled time)
 #
-# The `LED Brightness` number entity (0–100%) controls the idle brightness.
-# When a keypress or fingerprint scan is detected, the firmware boosts to
-# 100% for 30 seconds automatically — no automation needed for that.
+# HOW TO USE:
+#   Settings → Automations → New Automation → 3-dot menu → Edit in YAML
+#   Paste this block. Replace the values marked REPLACE.
 #
-# These automations let you dim all keypads at night from HA.
+# Dims the keypad LED at a set time each night.
+# The firmware auto-boosts to 100% whenever a key is pressed,
+# then returns to this idle level after 30 seconds.
 #
-# MULTI-KEYPAD:
-#   The "set all keypads" actions list every keypad.
-#   Add or remove entries to match your installation.
+# For day-mode (restore brightness) see led-brightness-day.yaml.
+#
+# REPLACE:
+#   - number.REPLACE_DEVICE_led_brightness
+#     → e.g. number.esphome_keypad_58066c_led_brightness
 
-automation:
-  # ----------------------------------------------------------------
-  # Night mode — dim all keypads at a scheduled time
-  # ----------------------------------------------------------------
-  - alias: "Keypad LED: Night mode — dim all"
-    id: keypad_led_night_mode
-    trigger:
-      - platform: time
-        at: "22:00:00"
-    action:
-      - service: number.set_value
-        target:
-          entity_id:
-            - number.front_door_led_brightness
-            - number.garage_led_brightness
-            # Add more keypads here
-        data:
-          value: 20
-
-  # ----------------------------------------------------------------
-  # Day mode — restore brightness in the morning
-  # ----------------------------------------------------------------
-  - alias: "Keypad LED: Day mode — restore brightness"
-    id: keypad_led_day_mode
-    trigger:
-      - platform: time
-        at: "07:00:00"
-    action:
-      - service: number.set_value
-        target:
-          entity_id:
-            - number.front_door_led_brightness
-            - number.garage_led_brightness
-        data:
-          value: 100
-
-  # ----------------------------------------------------------------
-  # Away mode — turn off LED when everyone is away
-  # ----------------------------------------------------------------
-  - alias: "Keypad LED: Away — LED off"
-    id: keypad_led_away_off
-    trigger:
-      - platform: state
-        entity_id: group.all_persons
-        to: "not_home"
-    action:
-      - service: esphome.esphome_front_door_set_led_colour
-        data:
-          hex: "off"
-      - service: esphome.esphome_garage_set_led_colour
-        data:
-          hex: "off"
-
-  # ----------------------------------------------------------------
-  # Home mode — turn LED back on when someone arrives
-  # ----------------------------------------------------------------
-  - alias: "Keypad LED: Home — LED on"
-    id: keypad_led_home_on
-    trigger:
-      - platform: state
-        entity_id: group.all_persons
-        to: "home"
-    action:
-      - service: esphome.esphome_front_door_set_led_colour
-        data:
-          hex: "FFFFFF"
-          brightness: "{{ states('number.front_door_led_brightness') | int }}"
-      - service: esphome.esphome_garage_set_led_colour
-        data:
-          hex: "FFFFFF"
-          brightness: "{{ states('number.garage_led_brightness') | int }}"
+alias: "Keypad LED: Night mode — dim"
+description: Dims the keypad LED at night.
+triggers:
+  - trigger: time
+    at: "22:00:00"
+conditions: []
+actions:
+  - action: number.set_value
+    target:
+      entity_id: number.REPLACE_DEVICE_led_brightness
+    data:
+      value: 20
+mode: single

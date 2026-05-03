@@ -24,7 +24,7 @@ fingerprint_grow:
   sensor_power_pin:
     number: 47
     inverted: true
-  idle_period_to_sleep: 300s
+  idle_period_to_sleep: 30s
 
   on_finger_scan_matched:
     - script.execute: led_brightness_boost
@@ -33,6 +33,15 @@ fingerprint_grow:
         speed: 200
         color: GREEN
         count: 1
+    - lambda: |-
+        auto &v = id(status_light).current_values;
+        id(saved_r)   = v.get_red();
+        id(saved_g)   = v.get_green();
+        id(saved_b)   = v.get_blue();
+        id(saved_bri) = v.get_brightness();
+        id(saved_on)  = v.is_on();
+        id(result_active) = true;
+    - script.execute: keypad_led_result
     - if:
         condition:
           or:
@@ -60,7 +69,7 @@ fingerprint_grow:
     - fingerprint_grow.aura_led_control:
         state: FLASHING
         speed: 25
-        color: PURPLE
+        color: YELLOW
         count: 2
     - script.execute: fp_aura_restore
 
@@ -69,19 +78,19 @@ fingerprint_grow:
     - fingerprint_grow.aura_led_control:
         state: FLASHING
         speed: 25
-        color: BLUE
+        color: CYAN
         count: 2
     - delay: 1s
     - fingerprint_grow.aura_led_control:
         state: ALWAYS_ON
         speed: 0
-        color: PURPLE
+        color: CYAN
         count: 0
   on_enrollment_done:
     - fingerprint_grow.aura_led_control:
         state: BREATHING
         speed: 100
-        color: BLUE
+        color: GREEN
         count: 2
     - script.execute: fp_aura_restore
 
@@ -98,7 +107,7 @@ fingerprint_grow:
     - fingerprint_grow.aura_led_control:
         state: FLASHING
         speed: 25
-        color: RED
+        color: YELLOW
         count: 2
     - script.execute: fp_aura_restore
 
