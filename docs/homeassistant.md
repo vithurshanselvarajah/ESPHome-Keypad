@@ -4,27 +4,75 @@
 
 The device integrates with HA via the **ESPHome encrypted API**. After adding the device in HA (using the `api_encryption_key` from `secrets.yaml`), the following become available:
 
-- **HA entities** — sensors, light, and number entities on the device page
+- **HA entities** — sensors, light, number, and text sensor entities on the device page
 - **HA events** — fired by the device for PIN entry and fingerprint matches
 - **HA actions (services)** — called from HA to control the device
 
 ---
 
+## Primary Use Case — Alarm Arm/Disarm
+
+The keypad is designed to arm and disarm a home security alarm via PIN or fingerprint.
+The LED colour acts as the alarm state indicator visible from the keypad:
+
+| LED colour | Alarm state |
+|---|---|
+| Green `#33FF00` | Armed |
+| Red `#FF0000` | Disarmed |
+
+The `LED Colour Hex` sensor (`sensor.<device>_led_colour_hex`) exposes the current colour
+to HA so automations can read it as the alarm state without a separate state entity.
+
+### How a PIN entry works
+
+1. User enters 4 digits and presses `#`.
+2. The keypad plays a **blue flash × 3** progress indicator.
+3. The LED then **breathes in the current saved colour** for ~10 seconds
+   (green if armed, red if disarmed).
+4. HA receives the `esphome.keypad_code_entered` event.
+5. If the PIN matches, HA waits 2 seconds (so the breathing is visible),
+   then calls `set_led_colour` with the new state colour and arms/disarms the alarm.
+6. The new colour is visible on the LED — confirming the state change.
+
+---
+
+## Device Identification
+
+Each device has a unique suffix added to its name (`name_add_mac_suffix: true`).
+The actual device name will look like `esphome-keypad-58066c`.
+
+### Finding your device_id
+
+Events carry a `device_id` field. To find yours:
+
+1. Go to **Settings → Developer Tools → Events**
+2. Listen for `esphome.keypad_code_entered`
+3. Press `#` on the keypad
+4. Copy the `device_id` from the event data (e.g. `49e04c941b3fdf876fd0390eb5a6ff1a`)
+
+Use this `device_id` in trigger `event_data` filters — it uniquely identifies
+the physical device regardless of its name.
+
+---
+
 ## Multi-Keypad Setup
 
-Each keypad has a unique `device_name` substitution in `keypad.yaml`. This prefixes all action names and distinguishes entities in HA so multiple keypads on the same instance never conflict.
+Each keypad has a unique `device_name` substitution in `keypad.yaml`. This prefixes
+all action names and distinguishes entities in HA so multiple keypads never conflict.
 
-| `device_name` | Action prefix | Example entity |
+| `device_name` | Action prefix | Entity example |
 |---|---|---|
-| `esphome-front-door` | `esphome.esphome_front_door_` | `number.front_door_led_brightness` |
-| `esphome-garage` | `esphome.esphome_garage_` | `number.garage_led_brightness` |
+| `esphome-keypad` (+ MAC) | `esphome.esphome_keypad_58066c_` | `sensor.keypad_58066c_led_colour_hex` |
 
-**Events** (`keypad_code_entered`, `fingerprint_authenticated`) fire on the same event type from all keypads. Use `trigger.event.origin` in automations to identify which device fired:
+**Events** (`keypad_code_entered`, `fingerprint_authenticated`) fire on the same event
+type from all keypads. Filter to a specific keypad using `event_data.device_id`:
 
 ```yaml
-condition:
-  - condition: template
-    value_template: "{{ trigger.event.origin == 'esphome-front-door' }}"
+triggers:
+  - trigger: event
+    event_type: esphome.keypad_code_entered
+    event_data:
+      device_id: 49e04c941b3fdf876fd0390eb5a6ff1a
 ```
 
 ---
@@ -43,9 +91,21 @@ Fired when a 4-digit PIN is submitted with `#`.
 
 | Field | Type | Example |
 |---|---|---|
+| `device_id` | string | `"49e04c941b3fdf876fd0390eb5a6ff1a"` |
 | `code` | string | `"1234"` |
 
-**Security:** Store PINs in `secrets.yaml`, not in automation YAML. Avoid logging the `code` field. See `automations/pin-access.yaml` for a safe pattern using `input_text` helpers.
+**Security:** Never log the `code` field in notifications or automation descriptions.
+Match the PIN directly in `event_data.code` in the trigger — not in a condition — so
+the automation only fires for the correct PIN:
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: esphome.keypad_code_entered
+    event_data:
+      device_id: YOUR_DEVICE_ID
+      code: "1234"
+```
 
 ---
 
@@ -57,10 +117,11 @@ Fired when a placed finger matches an enrolled template.
 
 | Field | Type | Description |
 |---|---|---|
+| `device_id` | string | Device identifier |
 | `id` | string | Slot number of the matched fingerprint |
 | `confidence` | string | Match score 0–255 (higher = better match) |
 
-**Mapping slots to people:** Maintain a slot → name mapping using `input_text.fp_slot_N_name` helpers. See `automations/fingerprint-access.yaml`.
+Reject low-confidence matches with a condition: `{{ trigger.event.data.confidence | int >= 50 }}`.
 
 ---
 
@@ -73,9 +134,10 @@ Fired after a successful `fingerprint_backup_slot` action call.
 | `slot` | string | Slot number that was backed up |
 | `data` | string | Base64-encoded 512-byte fingerprint template (~684 chars) |
 
-**Important:** This is the only way to retrieve template data. It is not stored persistently on the ESP. Capture it immediately in an automation — see `automations/fingerprint-backup.yaml`.
+**Important:** Capture this immediately in an automation — see `automations/fingerprint-backup.yaml`.
 
-> **Note:** Use `input_text` helpers with `max: 1024` to store full templates.
+> **Note:** Use `input_text` helpers with max length 1024 to store full templates.
+> Create them in **Settings → Devices & Services → Helpers**.
 
 ---
 
@@ -83,8 +145,34 @@ Fired after a successful `fingerprint_backup_slot` action call.
 
 Actions are called from **Settings → Developer Tools → Actions** or in automations.
 
-Action names follow the pattern: `esphome.<device_name>_<action_name>`
-With `device_name: "esphome-front-door"` the prefix is `esphome.esphome_front_door_`.
+Action names follow the pattern: `esphome.<device_name_underscored>_<action_name>`
+
+With `device_name: "esphome-keypad"` + MAC suffix `58066c`:
+→ prefix is `esphome.esphome_keypad_58066c_`
+
+---
+
+### `set_led_colour`
+
+Change the status LED colour from HA.
+
+| Variable | Type | Description |
+|---|---|---|
+| `hex` | `string` | 6-digit or `#`-prefixed RGB hex (`"FF8800"`, `"#FF8800"`), or `"off"` to turn off |
+| `brightness` | `int` | 0–100. When provided (≥ 1), becomes the new idle brightness level. |
+
+The current colour is published to the `LED Colour Hex` sensor every time this action runs,
+and also on reconnect via `on_client_connected`. Read it as alarm state:
+
+```yaml
+condition:
+  - condition: state
+    entity_id: sensor.keypad_58066c_led_colour_hex
+    state: "#33FF00"   # true = alarm is armed
+```
+
+If called while the keypad is breathing after a PIN entry, the new colour is stored
+and applied when the breathing finishes.
 
 ---
 
@@ -97,9 +185,10 @@ Enroll a fingerprint into a specific slot.
 | `slot` | `int` | Slot number (1 to sensor capacity) |
 | `num_scans` | `int` | Number of scans required (typically 2–3) |
 
-After calling: place finger on sensor when the aura LED turns purple. Lift after each blue flash. Blue breathing = enrolled. See `automations/fingerprint-enroll.yaml` for an auto-distribute workflow.
+After calling: place finger on sensor when the aura LED turns purple. Lift after each blue flash.
+Blue breathing = enrolled. See `automations/fingerprint-enroll.yaml`.
 
-> **Auto-wake:** this action power-cycles the sensor before starting enrollment, so the sensor is always ready regardless of sleep state. The aura ring shows slow blue breathing while awake.
+> **Auto-wake:** this action power-cycles the sensor before starting enrollment.
 
 ---
 
@@ -111,14 +200,8 @@ Cancel any in-progress enrollment. No variables. Safe to call at any time.
 
 ### `fingerprint_sensor_wake`
 
-Power-cycle the R503 sensor via GPIO47. No variables. The sensor is ready approximately 2 seconds after the call; the aura ring returns to slow blue breathing.
-
-Use this before a sequence of backup/restore operations when you want the sensor awake upfront. All individual backup/restore/delete/enroll actions call this automatically, so you only need it explicitly when batching operations.
-
-```yaml
-# Wake the sensor on the front door keypad
-service: esphome.esphome_front_door_fingerprint_sensor_wake
-```
+Power-cycle the R503 sensor. No variables. Sensor ready ~2 seconds after call.
+All individual backup/restore/delete/enroll actions call this automatically.
 
 ---
 
@@ -146,14 +229,8 @@ Back up the template stored at `slot` as a base64 string.
 |---|---|---|
 | `slot` | `int` | Slot to read from |
 
-**Prerequisites:**
-- Slot must be enrolled
-
-(Sensor is woken automatically before the backup is attempted.)
-
-**On success:** Fires `esphome.fingerprint_backup_data` event. Result also held in `fp_backup_data_str` global until the next backup call clears it.
-
-**On failure:** No event fired. Check ESPHome logs.
+On success: fires `esphome.fingerprint_backup_data` event.
+On failure: no event fired — check ESPHome logs.
 
 ---
 
@@ -166,23 +243,6 @@ Write a previously-backed-up template back into a slot.
 | `slot` | `int` | Target slot number |
 | `data` | `string` | Base64-encoded template from a previous `fingerprint_backup_data` event |
 
-**Prerequisites:** Slot must be enrolled. Sensor is woken automatically.
-
-**After success:** `Fingerprint Count` sensor is refreshed via `fingerprint_sensor.update()`.
-
----
-
-### `set_led_colour`
-
-Change the status LED colour from HA.
-
-| Variable | Type | Description |
-|---|---|---|
-| `hex` | `string` | 6-digit RGB hex (`"FF8800"`, `"#FF8800"`), or `"off"` to turn off |
-| `brightness` | `int` | 0–100. If 0 or omitted, the current idle brightness is used. When provided, becomes the new idle level. |
-
-Updates the saved LED state globals. If called during the 2s result window after PIN submission, the light is not changed immediately — the colour is applied when `keypad_restore_state` runs at the end of the window.
-
 ---
 
 ## HA Entities (Device Page)
@@ -191,103 +251,98 @@ Updates the saved LED state globals. If called during the 2s result window after
 |---|---|---|
 | Fingerprint Count | Sensor | Number of enrolled fingerprints |
 | Fingerprint Capacity | Sensor | Maximum slots (200) |
-| Status Light | Light | WS2811 strip — direct control; use `set_led_colour` for saved-state tracking |
+| LED Colour Hex | Text sensor | Current LED colour as `#RRGGBB` hex string — use as alarm state indicator |
+| Status Light | Light | WS2811 strip — use `set_led_colour` for saved-state tracking |
 | LED Brightness | Number | Idle brightness 0–100%. Activity boosts to 100% for 30s then returns here. |
 
 ---
 
-## PIN Entry — LED Result Window
+## LED Breathing After PIN Entry
 
 After `#` is pressed:
-1. The strip flashes **blue x 3** (3 x 150ms on/off)
-2. The device waits **2 seconds** for HA to call `set_led_colour`
-3. If `set_led_colour` arrives — that colour is applied on restore
-4. If nothing arrives — the pre-entry colour is restored
+1. The strip flashes **blue × 3** (confirmation of key received)
+2. The LED **breathes in the current saved colour** for ~10 seconds (5 cycles)
+3. HA automations should **wait 2 seconds** before calling `set_led_colour` so the
+   breathing is visible before the new alarm-state colour is applied
 
-Use the automations in `automations/led-feedback.yaml` to send green (granted) or red (denied) during this window.
+```yaml
+actions:
+  - delay:
+      seconds: 2
+  - action: esphome.esphome_keypad_58066c_set_led_colour
+    data:
+      hex: "#33FF00"   # green = armed
+      brightness: 50
+```
+
+Calling `set_led_colour` during breathing stops the breathing immediately and applies
+the new colour.
 
 ---
 
 ## Automations
 
-Ready-to-use automations are in the `automations/` folder. See [automations/README.md](../automations/README.md) for the full list.
+Ready-to-use single-automation files are in the `automations/` folder.
+See [automations/README.md](../automations/README.md) for the full list and quick-start guide.
 
-### PIN access
+Each file contains one automation in the modern HA format — paste directly into
+**Settings → Automations → New Automation → ⋮ → Edit in YAML**.
 
-```yaml
-automation:
-  - alias: "Keypad: Front Door — PIN access"
-    trigger:
-      - platform: event
-        event_type: esphome.keypad_code_entered
-    condition:
-      - condition: template
-        value_template: "{{ trigger.event.origin == 'esphome-front-door' }}"
-      - condition: template
-        value_template: "{{ trigger.event.data.code == states('input_text.front_door_pin') }}"
-    action:
-      - service: lock.unlock
-        target:
-          entity_id: lock.front_door
-      - service: esphome.esphome_front_door_set_led_colour
-        data:
-          hex: "00FF00"
-          brightness: 100
-```
-
-### Fingerprint backup and restore to all keypads
+### Alarm toggle by PIN
 
 ```yaml
-# Step 1: capture backup data
-automation:
-  - alias: "Fingerprint: Capture backup"
-    trigger:
-      - platform: event
-        event_type: esphome.fingerprint_backup_data
-    action:
-      - service: input_text.set_value
+alias: "Alarm: Toggle armed/disarmed via PIN"
+triggers:
+  - trigger: event
+    event_type: esphome.keypad_code_entered
+    event_data:
+      device_id: YOUR_DEVICE_ID
+      code: "1234"
+conditions: []
+actions:
+  - if:
+      - condition: state
+        entity_id: sensor.keypad_58066c_led_colour_hex
+        state: "#33FF00"
+    then:
+      - delay:
+          seconds: 2
+      - action: esphome.esphome_keypad_58066c_set_led_colour
+        data:
+          hex: "#FF0000"
+          brightness: 50
+      - action: alarm_control_panel.alarm_disarm
         target:
-          entity_id: "input_text.fp_backup_slot_{{ trigger.event.data.slot }}"
+          entity_id: alarm_control_panel.home_alarm
+    else:
+      - delay:
+          seconds: 2
+      - action: esphome.esphome_keypad_58066c_set_led_colour
         data:
-          value: "{{ trigger.event.data.data }}"
-
-# Step 2: restore to all keypads
-# Fire event: keypad.restore_slot_to_all  data: {slot: 1}
-automation:
-  - alias: "Fingerprint: Restore to all keypads"
-    trigger:
-      - platform: event
-        event_type: keypad.restore_slot_to_all
-    variables:
-      slot: "{{ trigger.event.data.slot }}"
-      data: "{{ states('input_text.fp_backup_slot_' ~ slot) }}"
-    action:
-      - service: esphome.esphome_front_door_fingerprint_restore_slot
-        data:
-          slot: "{{ slot | int }}"
-          data: "{{ data }}"
-      - delay: "00:00:02"
-      - service: esphome.esphome_garage_fingerprint_restore_slot
-        data:
-          slot: "{{ slot | int }}"
-          data: "{{ data }}"
+          hex: "#33FF00"
+          brightness: 50
+      - action: alarm_control_panel.alarm_arm_away
+        target:
+          entity_id: alarm_control_panel.home_alarm
+mode: single
 ```
-
-Full examples for all scenarios are in `automations/`.
 
 ---
 
 ## Developer Tools Workflow
 
-### Back up a slot and view the data
+### Find your device_id
 
-1. **Settings → Developer Tools → Events** — listen to `esphome.fingerprint_backup_data`
-2. Place a finger on the sensor to wake it
-3. **Settings → Developer Tools → Actions** — call `esphome.esphome_front_door_fingerprint_backup_slot` with `slot: 1`
-4. The event appears with `slot` and `data` fields
+1. **Settings → Developer Tools → Events** — listen to `esphome.keypad_code_entered`
+2. Press `#` on the physical keypad
+3. Copy the `device_id` from the event payload
 
 ### Test PIN handling
 
-1. **Settings → Developer Tools → Events** — listen to `esphome.keypad_code_entered`
-2. Enter a PIN on the physical keypad and press `#`
-3. Verify the event appears with the correct `code` and the expected `origin`
+Same as above — the `code` field will show the entered PIN.
+
+### Back up a fingerprint slot
+
+1. **Settings → Developer Tools → Actions** — call `esphome.esphome_keypad_58066c_fingerprint_backup_slot` with `slot: 1`
+2. **Settings → Developer Tools → Events** — listen to `esphome.fingerprint_backup_data`
+3. The event appears with `slot` and `data` fields — the automation in `fingerprint-backup.yaml` captures this automatically.
