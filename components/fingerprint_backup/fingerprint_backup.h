@@ -25,18 +25,18 @@ static std::vector<uint8_t> build_cmd(uint8_t instr, std::vector<uint8_t> args) 
 
 static bool read_pkt(esphome::uart::UARTComponent *u, uint8_t &pid, uint8_t &conf,
                      std::vector<uint8_t> &data, uint32_t ms = 3000) {
-  uint32_t t0 = millis();
+  uint32_t t0 = esphome::millis();
   uint32_t last_wdt = t0;
   uint8_t b;
   auto rb = [&](uint8_t &out) -> bool {
-    while ((millis() - t0) < ms) {
+    while ((esphome::millis() - t0) < ms) {
       if (u->available()) {
         u->read_byte(&out);
         return true;
       }
-      uint32_t now = millis();
+      uint32_t now = esphome::millis();
       if (now - last_wdt >= 1000) {
-        App.feed_wdt();
+        esphome::App.feed_wdt();
         last_wdt = now;
       }
     }
@@ -130,7 +130,7 @@ static std::vector<uint8_t> b64dec(const std::string &s) {
 static std::string backup_slot(esphome::uart::UARTComponent *uart, int slot) {
   {
     uint8_t d;
-    delay(30);
+    esphome::delay(30);
     while (uart->available())
       uart->read_byte(&d);
   }
@@ -176,7 +176,7 @@ static bool restore_slot(esphome::uart::UARTComponent *uart, int slot, const std
 
   {
     uint8_t d;
-    delay(30);
+    esphome::delay(30);
     while (uart->available())
       uart->read_byte(&d);
   }
@@ -209,9 +209,9 @@ static bool restore_slot(esphome::uart::UARTComponent *uart, int slot, const std
     pkt.push_back(chk & 0xFF);
     uart->write_array(pkt.data(), pkt.size());
     off += chunk;
-    App.feed_wdt();
+    esphome::App.feed_wdt();
   }
-  delay(50);
+  esphome::delay(50);
 
   auto st = build_cmd(0x06, {0x01, (uint8_t) (slot >> 8), (uint8_t) (slot & 0xFF)});
   uart->write_array(st.data(), st.size());
