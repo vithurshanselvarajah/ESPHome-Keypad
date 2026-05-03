@@ -91,6 +91,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Point keypad refs to current branch
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          branch = os.environ["BRANCH"]
+          path = Path("keypad.yaml")
+          text = path.read_text(encoding="utf-8")
+          updated = text.replace("ref: main", f"ref: {branch}")
+          path.write_text(updated, encoding="utf-8")
+          print(f"keypad.yaml refs set to: {branch}")
+          PY
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+
       - name: Cache pip
         uses: actions/cache@v4
         with:
@@ -118,6 +134,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Point keypad refs to current branch
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          branch = os.environ["BRANCH"]
+          path = Path("keypad.yaml")
+          text = path.read_text(encoding="utf-8")
+          updated = text.replace("ref: main", f"ref: {branch}")
+          path.write_text(updated, encoding="utf-8")
+          print(f"keypad.yaml refs set to: {branch}")
+          PY
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
 
       - name: Cache pip
         uses: actions/cache@v4

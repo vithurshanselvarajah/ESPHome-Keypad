@@ -116,6 +116,7 @@ jobs:
         run: |
           gh release create "v${{ steps.version.outputs.version }}" \
             "${{ env.FIRMWARE }}" \
+            "keypad.yaml" \
             --title      "Release v${{ steps.version.outputs.version }}" \
             --notes-file /tmp/changelog.md \
             --verify-tag
