@@ -6,14 +6,48 @@ on:
   pull_request:
     branches: ["main", "develop"]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  precheck:
+    name: CI precheck
+    runs-on: ubuntu-latest
+    outputs:
+      run_ci: ${{ steps.decide.outputs.run_ci }}
+    steps:
+      - id: decide
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== 'push') {
+              core.setOutput('run_ci', 'true');
+              return;
+            }
+
+            const branch = context.ref.replace('refs/heads/', '');
+            const head = `${context.repo.owner}:${branch}`;
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head,
+              per_page: 100,
+            });
+
+            core.info(`Open PRs for ${head}: ${prs.length}`);
+            core.setOutput('run_ci', prs.length === 0 ? 'true' : 'false');
+
   test:
     name: Tests
     runs-on: ubuntu-latest
+    needs: precheck
+    if: needs.precheck.outputs.run_ci == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +64,8 @@ jobs:
   lint:
     name: Lint automations
     runs-on: ubuntu-latest
+    needs: precheck
+    if: needs.precheck.outputs.run_ci == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -46,6 +82,8 @@ jobs:
   validate:
     name: Validate ESPHome config
     runs-on: ubuntu-latest
+    needs: precheck
+    if: needs.precheck.outputs.run_ci == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -72,7 +110,8 @@ jobs:
   compile:
     name: Compile firmware
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [precheck, validate]
+    if: needs.precheck.outputs.run_ci == 'true'
     steps:
       - uses: actions/checkout@v4
 
