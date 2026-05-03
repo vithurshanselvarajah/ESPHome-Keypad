@@ -69,7 +69,7 @@ fingerprint_grow:
     - fingerprint_grow.aura_led_control:
         state: FLASHING
         speed: 25
-        color: PURPLE
+        color: YELLOW
         count: 2
     - script.execute: fp_aura_restore
 
@@ -78,19 +78,19 @@ fingerprint_grow:
     - fingerprint_grow.aura_led_control:
         state: FLASHING
         speed: 25
-        color: BLUE
+        color: CYAN
         count: 2
     - delay: 1s
     - fingerprint_grow.aura_led_control:
         state: ALWAYS_ON
         speed: 0
-        color: PURPLE
+        color: CYAN
         count: 0
   on_enrollment_done:
     - fingerprint_grow.aura_led_control:
         state: BREATHING
         speed: 100
-        color: BLUE
+        color: GREEN
         count: 2
     - script.execute: fp_aura_restore
 
@@ -107,7 +107,7 @@ fingerprint_grow:
     - fingerprint_grow.aura_led_control:
         state: FLASHING
         speed: 25
-        color: RED
+        color: YELLOW
         count: 2
     - script.execute: fp_aura_restore
 

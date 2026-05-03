@@ -182,12 +182,15 @@ not part of the `status_light` entity.
 
 | Event | Aura animation |
 |---|---|
-| Finger matched | Green breathing, 1 cycle |
-| Finger not matched | Red flashing, 4 flashes |
-| Finger misplaced | Purple flashing, 2 flashes |
-| Enrollment scan | Blue flash × 2, then solid purple |
-| Enrollment done | Blue breathing |
-| Idle / awake | Slow blue breathing |
+| Idle / awake | Slow blue breathing — **ready** |
+| Finger matched | Green breathing, 1 cycle — **granted** |
+| Finger not matched | Red flashing × 4 — **denied** |
+| Finger misplaced | Yellow flashing × 2 — **reposition finger** |
+| Finger invalid | Yellow flashing × 2 — **try again** |
+| Enrollment — each scan | Cyan flash × 2, then solid cyan — **scan received, place finger again** |
+| Enrollment done | Green breathing × 2 — **enrolled successfully** |
+| Enrollment failed | Red flashing × 4 — **enrollment failed** |
+| Sensor asleep | Off — **power saving** |
 
 The WS2811 strip **breathes in the saved colour** on a successful fingerprint match,
 identical to PIN submission. HA automations responding to
