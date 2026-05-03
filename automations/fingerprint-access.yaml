@@ -32,6 +32,8 @@ actions:
         entity_id: REPLACE_COLOUR_SENSOR
         state: "#33FF00"
     then:
+      - delay:
+          seconds: 2
       - alias: "Disarm — set LED red"
         action: esphome.REPLACE_ACTION_PREFIX_set_led_colour
         data:
@@ -42,6 +44,8 @@ actions:
         target:
           entity_id: alarm_control_panel.home_alarm
     else:
+      - delay:
+          seconds: 2
       - alias: "Arm — set LED green"
         action: esphome.REPLACE_ACTION_PREFIX_set_led_colour
         data:

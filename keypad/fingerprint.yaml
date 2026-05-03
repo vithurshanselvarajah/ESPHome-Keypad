@@ -33,6 +33,15 @@ fingerprint_grow:
         speed: 200
         color: GREEN
         count: 1
+    - lambda: |-
+        auto &v = id(status_light).current_values;
+        id(saved_r)   = v.get_red();
+        id(saved_g)   = v.get_green();
+        id(saved_b)   = v.get_blue();
+        id(saved_bri) = v.get_brightness();
+        id(saved_on)  = v.is_on();
+        id(result_active) = true;
+    - script.execute: keypad_led_result
     - if:
         condition:
           or:

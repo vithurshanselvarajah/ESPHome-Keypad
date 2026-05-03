@@ -24,8 +24,13 @@ The strip starts **off** on every boot. The `ALWAYS_OFF` restore mode is intenti
 | White 50% | Home Assistant connected and active |
 | White 50% (on boot) | Debug mode enabled (`debug_mode: "1"`) |
 | Blue progress LEDs | PIN entry in progress — one LED per digit, from the right |
-| Blue flash × 3 | PIN submitted — blue flash 3 times (150ms on/off), 2s HA response window, then restore or HA colour |
+| Breathing in current colour | PIN submitted or fingerprint matched — strip breathes (bright → dim) in the saved colour for ~10 s while HA responds |
+| Breathing stopped, new colour | HA called `set_led_colour` during the breathing — colour updates immediately |
+| Green `#33FF00` | Alarm armed (set by HA automation after correct PIN or fingerprint) |
+| Red `#FF0000` | Alarm disarmed (set by HA automation after correct PIN or fingerprint) |
 | Custom colour | Set via `set_led_colour` API action |
+
+> **Fingerprint scans:** the WS2811 strip does **not** breathe on fingerprint match. The R503 sensor's built-in aura ring performs a single green breathing cycle. The strip is only brightness-boosted (see below). HA can call `set_led_colour` immediately after a fingerprint event — no delay needed.
 
 ---
 
@@ -120,21 +125,29 @@ This means with `count=1` only the rightmost LED is blue; with `count=4` all fou
 
 ### `keypad_led_result`
 
-Provides visual confirmation after PIN submission and opens a 2s window for HA colour response.
+Breathing animation after PIN submission (~10 s). Gives HA time to respond and provides
+visual feedback in the current alarm-state colour.
 
 ```
-1. Blue flash × 3:
-     turn on blue (0, 0, 255) 100%, transition 0ms
-     delay 150ms
-     turn off, transition 0ms
-     delay 150ms
-     (repeat × 3)
-2. Delay 2s  ← HA can call set_led_colour within this window
-3. Execute keypad_restore_state
-     (applies HA colour if set_led_colour was called, otherwise pre-entry colour)
+Repeat 5 times:
+  1. turn_on saved colour, brightness 100%, transition 800ms
+  2. delay 1000ms
+  3. turn_on saved colour, brightness 10%, transition 800ms
+  4. delay 1000ms
+Total: ~10 s
+
+5. Execute keypad_restore_state
 ```
 
-Called by `on_result` (PIN submitted via `#`).
+The `result_active` flag is set to `true` before this script runs and cleared when
+`keypad_restore_state` completes. This prevents `on_progress` (fired by the `#` key)
+from immediately stopping the breathing.
+
+HA automations should wait **2 seconds** before calling `set_led_colour` so at least
+one full breathing cycle is visible. Calling `set_led_colour` stops the breathing
+immediately and applies the new colour.
+
+Called by `on_result` (PIN submitted via `#`). **Not called by fingerprint scans.**
 
 ### `keypad_led_flash`
 
@@ -161,13 +174,35 @@ Mode: restart  (resets the 30s timer on each new interaction)
 
 ---
 
+## R503 Fingerprint Sensor Aura Ring
+
+The R503 has its own built-in LED ring separate from the WS2811 strip.
+It is controlled via `fingerprint_grow.aura_led_control` commands and is
+not part of the `status_light` entity.
+
+| Event | Aura animation |
+|---|---|
+| Finger matched | Green breathing, 1 cycle |
+| Finger not matched | Red flashing, 4 flashes |
+| Finger misplaced | Purple flashing, 2 flashes |
+| Enrollment scan | Blue flash × 2, then solid purple |
+| Enrollment done | Blue breathing |
+| Idle / awake | Slow blue breathing |
+
+The WS2811 strip **breathes in the saved colour** on a successful fingerprint match,
+identical to PIN submission. HA automations responding to
+`esphome.fingerprint_authenticated` should wait **2 seconds** before calling
+`set_led_colour` so at least one breathing cycle is visible first.
+
+---
+
 ## LED Interaction Priority
 
 When multiple things want to control the LED, this is the effective priority (highest wins):
 
 1. **Keypad entry in progress** — `keypad_led_progress` (direct addressable write)
-2. **Keypad result flash** — `keypad_led_result` (blue × 3, then 2s wait, then restore)
-3. **HA colour control** — `set_led_colour` action (updates saved state; skips `turn_on` during keypad activity so blue flash is not interrupted)
+2. **Keypad result breathing** — `keypad_led_result` (breathes in saved colour ~10 s; stopped immediately by `set_led_colour`)
+3. **HA colour control** — `set_led_colour` action (updates saved state; if `result_active`, stops breathing and applies colour immediately)
 4. **Brightness boost** — `led_brightness_boost` resets to 100% for 30s after any interaction; does not change colour
 5. **HA connection** — `on_client_connected` sets white at `led_idle_brightness` (not hardcoded 50%)
 6. **Boot** — off by default; white 50% only in debug mode
