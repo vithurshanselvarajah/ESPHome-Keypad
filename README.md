@@ -21,6 +21,8 @@ Features:
 | LED strip | WS2811 (4 LEDs, GRB order) |
 | Keypad | 3×4 matrix, no diodes |
 
+The PCB and enclosure design for this project is at **[sb-ocr/esphome-keypad](https://github.com/sb-ocr/esphome-keypad)**.
+
 See [docs/hardware.md](docs/hardware.md) for full GPIO wiring.
 
 ---
@@ -29,7 +31,7 @@ See [docs/hardware.md](docs/hardware.md) for full GPIO wiring.
 
 ### 1. Prerequisites
 
-- [ESPHome](https://esphome.io) ≥ 2024.x
+- [ESPHome](https://esphome.io) ≥ 2026.4
 - Home Assistant with ESPHome integration
 - Python environment with `esphome` installed
 
@@ -54,7 +56,14 @@ cp secrets.yaml.example secrets.yaml   # fill in your values
 
 ### 3. Adjust substitutions
 
-Open `keypad.yaml` and review the `substitutions` block. At minimum:
+Two entry-point files exist:
+
+| File | Use for |
+|---|---|
+| `keypad.yaml` | Fetches all packages directly from GitHub. Use this when you don't have a local clone or for reference. |
+| `keypad-local.yaml` | References local files. Use this for development and flashing from your workstation. |
+
+Open `keypad-local.yaml` and review the `substitutions` block. At minimum:
 
 - Set `debug_mode: "0"` and `api_reboot_timeout: "60s"` for production.
 - Set `fp_password` if you want to lock the fingerprint sensor (read the warning in the file first).
@@ -65,10 +74,10 @@ See [docs/configuration.md](docs/configuration.md) for a full reference.
 
 ```bash
 # First flash (USB, auto-detects port)
-esphome run keypad.yaml
+esphome run keypad-local.yaml
 
 # Subsequent OTA flashes
-esphome run keypad.yaml
+esphome run keypad-local.yaml
 ```
 
 ### 5. Add to Home Assistant
@@ -80,7 +89,8 @@ After the device is on the network, HA will auto-discover it. Accept the device 
 ## Project Structure
 
 ```
-keypad.yaml              ← Main entry point; all substitutions live here
+keypad.yaml              ← Remote entry point (fetches packages from GitHub)
+keypad-local.yaml        ← Local dev entry point (references local files)
 secrets.yaml             ← Credentials (not committed)
 
 keypad/
@@ -121,4 +131,3 @@ components/
 - OTA is password-protected (`ota_password`).
 - Fingerprint templates never leave the R503's flash in plain form; backup data is base64-encoded binary — not human-readable biometrics.
 - The keypad fires PIN codes as HA events. **Treat these events as sensitive** — use HA automations with secrets rather than exposing them in logs.
-- Change `ap_password` from the default before deploying.
