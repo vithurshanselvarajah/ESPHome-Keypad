@@ -67,7 +67,7 @@ pytest tests/test_project_structure.py -v
 | `test_secrets_yaml_is_gitignored` | `secrets.yaml` is listed in `.gitignore` |
 | `test_keypad_yaml_packages_present` | `keypad.yaml` includes all required package files |
 | `test_all_included_package_files_exist` | Every `!include` path in `keypad.yaml` resolves to an existing file |
-| `test_fingerprint_backup_header_exists` | `keypad/include/fingerprint_backup.h` is present |
+| `test_fingerprint_backup_header_exists` | `components/fingerprint_backup/fingerprint_backup.h` is present |
 
 ### What is NOT unit-tested
 
@@ -198,7 +198,9 @@ keypad/
   keypad.yaml             — Matrix keypad, PIN collector, LED feedback scripts
   status_light.yaml       — WS2811 LED strip, brightness entity and scripts
   debug.yaml              — Optional: web server, diagnostics (debug mode only)
-  include/
+components/
+  fingerprint_backup/
+    __init__.py           — ESPHome external component glue
     fingerprint_backup.h  — C++ header: raw Grow UART backup/restore
 automations/              — Ready-to-use HA automation examples
   README.md               — Index of all automation files

@@ -1,10 +1,10 @@
 esphome:
-  includes:
-    - keypad/include/fingerprint_backup.h
   on_boot:
     priority: -100
     then:
       - script.execute: fp_aura_idle
+
+fingerprint_backup: {}
 
 uart:
   id: uart_fingerprint

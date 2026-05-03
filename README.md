@@ -91,7 +91,9 @@ keypad/
   status_light.yaml      ← WS2811 strip (light entity only)
   debug.yaml             ← Debug-only: web server, diagnostics, test buttons
 
-  include/
+components/
+  fingerprint_backup/
+    __init__.py          ← ESPHome external component glue
     fingerprint_backup.h ← Raw Grow UART backup/restore (C++ header)
 ```
 

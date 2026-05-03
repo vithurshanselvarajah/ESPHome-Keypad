@@ -103,9 +103,9 @@ def test_all_included_package_files_exist():
 
 
 def test_fingerprint_backup_header_exists():
-    """fingerprint_backup.h must exist — it is required by fingerprint.yaml."""
-    header = ROOT / "keypad" / "include" / "fingerprint_backup.h"
+    """fingerprint_backup.h must exist in the external component directory."""
+    header = ROOT / "components" / "fingerprint_backup" / "fingerprint_backup.h"
     assert header.is_file(), (
-        "keypad/include/fingerprint_backup.h not found. "
+        "components/fingerprint_backup/fingerprint_backup.h not found. "
         "This file is required for fingerprint backup/restore functionality."
     )

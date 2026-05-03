@@ -4,7 +4,7 @@
 
 ESPHome's `fingerprint_grow` component does not expose the raw template data stored in the sensor's flash. The only way to read or write templates programmatically is to speak the Grow UART protocol directly, bypassing the component.
 
-`keypad/include/fingerprint_backup.h` implements this in a standalone C++ header in the `fp_backup` namespace. It is included by `fingerprint.yaml` and called from lambda blocks in `network.yaml` (API actions) and `debug.yaml` (debug buttons).
+`components/fingerprint_backup/fingerprint_backup.h` implements this in a standalone C++ header in the `fp_backup` namespace. It is loaded through the `fingerprint_backup` external component in `fingerprint.yaml` and called from lambda blocks in `network.yaml` (API actions) and `debug.yaml` (debug buttons).
 
 > ESPHome is single-threaded / cooperative — lambdas run to completion. There is no UART contention with the `fingerprint_grow` component during backup/restore.
 

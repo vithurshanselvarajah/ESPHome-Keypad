@@ -26,11 +26,11 @@ Each package is a standalone YAML fragment. ESPHome merges them all before compi
 | `keypad.yaml` | Entry point. All user-facing substitutions. Package declarations. |
 | `keypad/board.yaml` | ESP32-S3 chip config, ESP-IDF framework, logger, on-boot LED logic, `debug_mode_enabled` global. |
 | `keypad/network.yaml` | WiFi, HA API (including all actions), OTA. `fp_backup_data_str` global. |
-| `keypad/fingerprint.yaml` | UART, R503 sensor, all fingerprint triggers (aura LED feedback), HA sensors. Includes `fingerprint_backup.h`. |
+| `keypad/fingerprint.yaml` | UART, R503 sensor, all fingerprint triggers (aura LED feedback), HA sensors. Enables the `fingerprint_backup` external component. |
 | `keypad/keypad.yaml` | Matrix keypad hardware, `key_collector` PIN reader, LED feedback scripts, LED state globals. |
 | `keypad/status_light.yaml` | WS2811 strip (`light` entity), `led_brightness` number entity (0–100%), `led_brightness_boost` script, brightness globals. |
 | `keypad/debug.yaml` | **Debug only.** Web server, ESPHome debug component, diagnostic sensors, test buttons, FP backup/restore buttons. |
-| `keypad/include/fingerprint_backup.h` | C++ header. Raw Grow UART protocol implementation for `backup_slot()` and `restore_slot()`. |
+| `components/fingerprint_backup/fingerprint_backup.h` | C++ header. Raw Grow UART protocol implementation for `backup_slot()` and `restore_slot()`. Loaded via `external_components`. |
 
 ---
 
