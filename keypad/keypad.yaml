@@ -17,11 +17,14 @@ globals:
   - id: keypad_active
     type: bool
     initial_value: "false"
+  - id: result_active
+    type: bool
+    initial_value: "false"
 
 script:
   - id: keypad_restore_state
     then:
-      - lambda: "id(keypad_active) = false;"
+      - lambda: "id(keypad_active) = false; id(result_active) = false;"
       - if:
           condition:
             lambda: "return id(saved_on);"
@@ -76,42 +79,28 @@ script:
 
   - id: keypad_led_result
     then:
-      - light.turn_on:
-          id: status_light
-          brightness: 100%
-          red: 0%
-          green: 0%
-          blue: 100%
-          transition_length: 0ms
-      - delay: 150ms
-      - light.turn_off:
-          id: status_light
-          transition_length: 0ms
-      - delay: 150ms
-      - light.turn_on:
-          id: status_light
-          brightness: 100%
-          red: 0%
-          green: 0%
-          blue: 100%
-          transition_length: 0ms
-      - delay: 150ms
-      - light.turn_off:
-          id: status_light
-          transition_length: 0ms
-      - delay: 150ms
-      - light.turn_on:
-          id: status_light
-          brightness: 100%
-          red: 0%
-          green: 0%
-          blue: 100%
-          transition_length: 0ms
-      - delay: 150ms
-      - light.turn_off:
-          id: status_light
-          transition_length: 0ms
-      - delay: 2s
+      # Breathe in the saved colour for ~10 s (5 cycles × 2000 ms).
+      # delay must exceed transition_length or the transition gets cut off mid-way.
+      # Stopped immediately by set_led_colour when HA sends a colour override.
+      - repeat:
+          count: 5
+          then:
+            - light.turn_on:
+                id: status_light
+                red: !lambda "return id(saved_r);"
+                green: !lambda "return id(saved_g);"
+                blue: !lambda "return id(saved_b);"
+                brightness: 100%
+                transition_length: 800ms
+            - delay: 1000ms
+            - light.turn_on:
+                id: status_light
+                red: !lambda "return id(saved_r);"
+                green: !lambda "return id(saved_g);"
+                blue: !lambda "return id(saved_b);"
+                brightness: 10%
+                transition_length: 800ms
+            - delay: 1000ms
       - script.execute: keypad_restore_state
 
 matrix_keypad:
@@ -160,8 +149,12 @@ key_collector:
               - api.connected:
               - lambda: 'return id(debug_mode_enabled);'
           then:
-            - script.stop: keypad_led_result
-            - script.stop: keypad_led_flash
+            - if:
+                condition:
+                  lambda: "return !id(result_active);"
+                then:
+                  - script.stop: keypad_led_result
+                  - script.stop: keypad_led_flash
             - if:
                 condition:
                   lambda: "return !id(keypad_active);"
@@ -193,6 +186,7 @@ key_collector:
               - api.connected:
               - lambda: 'return id(debug_mode_enabled);'
           then:
+            - lambda: "id(result_active) = true;"
             - script.execute: led_brightness_boost
             - script.execute: keypad_led_result
             - homeassistant.event:
