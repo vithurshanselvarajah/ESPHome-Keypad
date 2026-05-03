@@ -22,7 +22,7 @@ jobs:
       run_ci: ${{ steps.decide.outputs.run_ci }}
     steps:
       - id: decide
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             if (context.eventName !== 'push') {
@@ -49,9 +49,9 @@ jobs:
     needs: precheck
     if: needs.precheck.outputs.run_ci == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -67,9 +67,9 @@ jobs:
     needs: test
     if: needs.precheck.outputs.run_ci == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -85,9 +85,9 @@ jobs:
     needs: lint
     if: needs.precheck.outputs.run_ci == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -108,7 +108,7 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-esphome-${{ hashFiles('**/requirements*.txt') }}
@@ -129,9 +129,9 @@ jobs:
     needs: [precheck, validate]
     if: needs.precheck.outputs.run_ci == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -152,7 +152,7 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-esphome-${{ hashFiles('**/requirements*.txt') }}
@@ -162,7 +162,7 @@ jobs:
         run: pip install --upgrade esphome
 
       - name: Cache PlatformIO packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.platformio
           key: ${{ runner.os }}-pio-${{ hashFiles('keypad.yaml', 'keypad/**/*.yaml', 'keypad/include/**') }}
@@ -175,7 +175,7 @@ jobs:
         run: esphome compile keypad.yaml
 
       - name: Upload firmware artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: firmware-${{ github.sha }}
           path: .esphome/build/esphome-keypad/.pioenvs/esphome-keypad/firmware.bin
