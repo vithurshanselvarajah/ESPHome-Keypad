@@ -55,6 +55,12 @@ script:
           id: led_brightness
           value: !lambda 'return id(led_idle_brightness) * 100.0f;'
 
+text_sensor:
+  - platform: template
+    name: "LED Colour Hex"
+    id: led_colour_hex
+    icon: mdi:palette
+
 light:
   - platform: esp32_rmt_led_strip
     rgb_order: GRB
