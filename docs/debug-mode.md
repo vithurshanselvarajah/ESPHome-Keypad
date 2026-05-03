@@ -6,7 +6,7 @@ Debug mode enables a built-in web server, live diagnostics, and standalone testi
 
 ## Enabling Debug Mode
 
-Two changes are required in `keypad.yaml`:
+Two changes are required in `keypad-local.yaml`:
 
 ```yaml
 substitutions:
@@ -15,10 +15,10 @@ substitutions:
 
 packages:
   # ...
-  debug: !include keypad/debug.yaml   # ← uncomment this line
+  debug: !include keypad/debug.yaml   # ← ensure this line is present and uncommented
 ```
 
-Flash, then access the web UI at `http://<device-ip>/` (or `http://esphome-keypad.local/`).
+Flash, then access the web UI at `http://<device-ip>/` (or `http://esphome-keypad-XXXXXX.local/`).
 
 ---
 
@@ -83,7 +83,6 @@ Flash, then access the web UI at `http://<device-ip>/` (or `http://esphome-keypa
 | Debug: FP Backup Buffer | 2s | `READY — NNN chars` or `idle — no data in buffer` |
 | Debug: FP Backup Data Preview | 2s | First 80 + last 20 chars of backup data (with ellipsis) |
 | Debug: FP Backup Last Result | 2s | Last result string from debug backup/restore buttons |
-| Debug: FP Sensor Capacity | 5s | `N enrolled / M slots` |
 
 ---
 

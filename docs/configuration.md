@@ -1,10 +1,10 @@
 # Configuration Reference
 
-All user-facing configuration lives in the `substitutions` block at the top of `keypad.yaml`. Nothing else needs to be edited for normal deployment.
+All user-facing configuration lives in the `substitutions` block at the top of both entry-point files. `keypad.yaml` is used by CI and for remote flashing; `keypad-local.yaml` is used for local development. The substitutions are identical between the two — nothing else needs to be edited for normal deployment.
 
 ---
 
-## keypad.yaml — Substitutions
+## keypad.yaml / keypad-local.yaml — Substitutions
 
 ### Identity
 
@@ -45,7 +45,7 @@ All user-facing configuration lives in the `substitutions` block at the top of `
 
 | Key | Default | Options | Description |
 |---|---|---|---|
-| `log_level` | `"DEBUG"` | `VERBOSE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `NONE` | ESPHome log verbosity. Use `WARN` for production (reduces log noise and slightly improves performance). Use `DEBUG` during development. |
+| `log_level` | `"ERROR"` (`"DEBUG"` in `keypad-local.yaml`) | `VERBOSE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `NONE` | ESPHome log verbosity. Use `ERROR` for production (reduces log noise and slightly improves performance). Use `DEBUG` during development. |
 
 ---
 
@@ -75,15 +75,15 @@ openssl rand -hex 16      # for ota_password (or use base64)
 
 ## Debug Package
 
-When `debug_mode: "1"`, also uncomment the debug package in `keypad.yaml`:
+When `debug_mode: "1"`, use `keypad-local.yaml` — the debug package is already included:
 
 ```yaml
 packages:
   # ...
-  debug: !include keypad/debug.yaml   # ← uncomment
+  debug: !include keypad/debug.yaml   # ← already present in keypad-local.yaml
 ```
 
-Comment it back out before flashing production firmware. The debug package adds ~50 KB of flash usage and exposes internal state via the web server.
+Comment it out before flashing production firmware. The debug package adds ~50 KB of flash usage and exposes internal state via the web server.
 
 ---
 
@@ -93,8 +93,8 @@ Before flashing to a permanently-installed device:
 
 - [ ] `debug_mode: "0"`
 - [ ] `api_reboot_timeout: "60s"`
-- [ ] `log_level: "WARN"`
-- [ ] `debug: !include keypad/debug.yaml` is **commented out**
+- [ ] `log_level: "ERROR"`
+- [ ] `debug: !include keypad/debug.yaml` is **commented out** in `keypad-local.yaml`
 - [ ] `api_encryption_key` is a unique, randomly generated value
 - [ ] `ota_password` is a strong unique password
 - [ ] `secrets.yaml` is not committed to version control

@@ -2,17 +2,34 @@
 
 ## Package System
 
-The project uses ESPHome's `packages` / `!include` system to split configuration into focused files. `keypad.yaml` is the single entry point — it holds all substitution variables and includes the packages.
+The project uses ESPHome's `packages` / `!include` system to split configuration into focused files. Two entry-point files exist at the repo root — both contain the same substitutions but load packages differently:
+
+**`keypad.yaml`** — fetches all packages directly from GitHub via `remote_package`. Used by CI and for over-the-air updates from any machine:
 
 ```yaml
-# keypad.yaml
+packages:
+  remote_package:
+    url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
+    ref: main
+    refresh: 300s
+    files:
+      - keypad/board.yaml
+      - keypad/network.yaml
+      - keypad/fingerprint.yaml
+      - keypad/keypad.yaml
+      - keypad/status_light.yaml
+```
+
+**`keypad-local.yaml`** — references local files via `!include`. Used when flashing or iterating from a local clone:
+
+```yaml
 packages:
   board:        !include keypad/board.yaml
   network:      !include keypad/network.yaml
   fingerprint:  !include keypad/fingerprint.yaml
   keypad:       !include keypad/keypad.yaml
   status_light: !include keypad/status_light.yaml
-  debug:        !include keypad/debug.yaml   # optional — debug only
+  debug:        !include keypad/debug.yaml
 ```
 
 Each package is a standalone YAML fragment. ESPHome merges them all before compiling.
@@ -23,7 +40,8 @@ Each package is a standalone YAML fragment. ESPHome merges them all before compi
 
 | File | Responsibility |
 |---|---|
-| `keypad.yaml` | Entry point. All user-facing substitutions. Package declarations. |
+| `keypad.yaml` | Remote entry point. All user-facing substitutions. Loads packages from GitHub via `remote_package`. Used by CI and release. |
+| `keypad-local.yaml` | Local dev entry point. Same substitutions. Loads packages via `!include`. Debug package included. |
 | `keypad/board.yaml` | ESP32-S3 chip config, ESP-IDF framework, logger, on-boot LED logic, `debug_mode_enabled` global. |
 | `keypad/network.yaml` | WiFi, HA API (including all actions), OTA. `fp_backup_data_str` global. |
 | `keypad/fingerprint.yaml` | UART, R503 sensor, all fingerprint triggers (aura LED feedback), HA sensors. Enables the `fingerprint_backup` external component. |
@@ -75,7 +93,7 @@ The `TemplateNumber` component (`Debug: LED Digit Simulator`) publishes its init
 ## Component Interaction Map
 
 ```
-keypad.yaml (substitutions)
+keypad.yaml / keypad-local.yaml (substitutions)
   │
   ├── board.yaml
   │     └── on_boot → status_light (debug only)

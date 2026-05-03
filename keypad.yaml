@@ -14,19 +14,9 @@ substitutions:
   debug_mode: "0"
   api_reboot_timeout: "60s"
 
-  log_level: "DEBUG"
+  log_level: "ERROR"
 
 packages:
-  # ── Local development ─────────────────────────────────────────────────
-  # Uncomment when flashing directly from your workstation and comment
-  # out the active remote block below.
-  # board:        !include keypad/board.yaml
-  # network:      !include keypad/network.yaml
-  # fingerprint:  !include keypad/fingerprint.yaml
-  # keypad:       !include keypad/keypad.yaml
-  # status_light: !include keypad/status_light.yaml
-
-  # ── Remote source ──────────────────────────────────────
   remote_package:
     url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
     ref: main

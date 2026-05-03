@@ -1,16 +1,4 @@
-# ====================================================
-#  Debug — Web UI, system diagnostics & test controls
-#
-#  Enable by adding to keypad.yaml packages:
-#    debug: !include keypad/debug.yaml
-#  and setting: debug_mode: "1"
-#
-#  Web UI:  http://<device-ip>/
-#  Log:     http://<device-ip>/logs
-# ====================================================
-
 globals:
-  # fp_backup_data_str is declared in network.yaml — not repeated here
   - id: dbg_fp_last_result_str
     type: std::string
     restore_value: no
@@ -26,26 +14,17 @@ globals:
 
 esphome:
   on_boot:
-    priority: -200   # After all components are set up
+    priority: -200
     then:
       - lambda: "id(debug_ready) = true;"
-
-# ---- Web server -----------------------------------------
-# Exposes every entity (including internal ones) in a web UI
-# and a real-time log stream at /logs
 
 web_server:
   port: 80
   version: 3
   include_internal: true
 
-# ---- ESPHome debug component ----------------------------
-# Populates free heap, loop time, reset reason, device info
-
 debug:
   update_interval: 5s
-
-# ---- System diagnostic sensors --------------------------
 
 sensor:
   - platform: debug
@@ -80,8 +59,6 @@ sensor:
     update_interval: 10s
     icon: mdi:thermometer
 
-# ---- System text sensors --------------------------------
-
 text_sensor:
   - platform: debug
     device:
@@ -104,9 +81,6 @@ text_sensor:
     mac_address:
       name: "Debug: MAC Address"
       id: dbg_mac
-
-# ---- Internal state visibility --------------------------
-# These mirror the runtime globals so you can watch them live in the web UI
 
   - platform: template
     name: "Debug: HA Connected"
@@ -155,9 +129,6 @@ text_sensor:
     lambda: |-
       if (id(fp_backup_data_str).empty())
         return std::string("(empty)");
-      // Show first 80 + last 20 chars with ellipsis so you can verify it looks valid
-      const auto &s = id(fp_backup_data_str);
-      if (s.size() <= 100) return s;
       return s.substr(0, 80) + "..." + s.substr(s.size() - 20);
 
   - platform: template
@@ -166,24 +137,6 @@ text_sensor:
     icon: mdi:check-circle-outline
     lambda: 'return id(dbg_fp_last_result_str);'
     update_interval: 2s
-
-  - platform: template
-    name: "Debug: FP Sensor Capacity"
-    id: dbg_fp_cap
-    update_interval: 5s
-    icon: mdi:counter
-    lambda: |-
-      char buf[32];
-      snprintf(buf, sizeof(buf), "%d enrolled / %d slots",
-               (int)round(id(fp_count_sensor).state),
-               (int)round(id(fp_capacity_sensor).state));
-      return std::string(buf);
-
-# ---- Switches -------------------------------------------
-
-# ---- LED digit progress slider + FP slot selector ------
-# LED: slide to 1-4 to simulate keypad digits; 0 restores
-# FP:  set which slot backup/restore/enroll buttons operate on
 
 number:
   - platform: template
@@ -203,7 +156,6 @@ number:
                 condition:
                   lambda: "return (int)x > 0;"
                 then:
-                  # Only snapshot state on first press (before keypad_active is set)
                   - if:
                       condition:
                         lambda: "return !id(keypad_active);"
@@ -234,11 +186,7 @@ number:
     on_value:
       - lambda: "id(dbg_selected_slot) = (int)x;"
 
-# ---- Test buttons ---------------------------------------
-
 button:
-
-  # ==== STATUS LED ====
 
   - platform: template
     name: "Debug: LED → White 100%"
@@ -307,8 +255,6 @@ button:
       - light.turn_off:
           id: status_light
 
-  # ==== PIN ENTRY FLOW ====
-
   - platform: template
     name: "Debug: PIN → Trigger Submit Flash"
     icon: mdi:gesture-tap-button
@@ -329,9 +275,6 @@ button:
           event: esphome.keypad_code_entered
           data:
             code: "1234"
-
-  # ==== FINGERPRINT AURA LED ====
-  # Each button mirrors an exact real trigger so you can verify the sensor ring
 
   - platform: template
     name: "Debug: FP Aura → Green Breathe [match]"
@@ -423,9 +366,6 @@ button:
           color: RED
           count: 0
 
-  # ==== FINGERPRINT MANAGEMENT ====
-  # Uses "Debug: FP Selected Slot" slider for slot number
-
   - platform: template
     name: "Debug: FP → Enroll Selected Slot (2 scans)"
     icon: mdi:account-plus
@@ -461,10 +401,6 @@ button:
             id: !lambda "return to_string(id(dbg_selected_slot));"
             confidence: "100"
 
-  # ==== FINGERPRINT BACKUP / RESTORE ====
-  # Set "Debug: FP Selected Slot" slider first, then use buttons below.
-  # Results appear in "Debug: FP Backup Last Result" and the log.
-
   - platform: template
     name: "Debug: FP → Backup Selected Slot"
     icon: mdi:database-export
@@ -498,34 +434,6 @@ button:
           if (ok) id(fingerprint_sensor).update();
 
   - platform: template
-    name: "Debug: FP → Backup All Enrolled Slots"
-    icon: mdi:database-export
-    on_press:
-      - lambda: |-
-          int count    = (int)round(id(fp_count_sensor).state);
-          int capacity = (int)round(id(fp_capacity_sensor).state);
-          if (count == 0) {
-            id(dbg_fp_last_result_str) = "FAIL: no fingerprints enrolled";
-            ESP_LOGW("fp_backup", "[DEBUG] Backup all: no enrolled fingerprints");
-            return;
-          }
-          int ok_count = 0, fail_count = 0;
-          for (int s = 1; s <= capacity; s++) {
-            std::string result = fp_backup::backup_slot(id(uart_fingerprint), s);
-            if (result.empty()) {
-              // Empty result = slot not enrolled or timeout; skip silently
-              continue;
-            }
-            ok_count++;
-            ESP_LOGI("fp_backup", "[DEBUG] Backup all: slot %d OK (%u chars)", s, (unsigned)result.size());
-            // Keep last successful result in buffer so it can be restored
-            id(fp_backup_data_str) = result;
-          }
-          if (ok_count == 0) fail_count = count;
-          id(dbg_fp_last_result_str) = "Backup all: " + to_string(ok_count) + " OK / " + to_string(capacity) + " slots checked (see logs)";
-          ESP_LOGI("fp_backup", "[DEBUG] Backup all complete: %d OK", ok_count);
-
-  - platform: template
     name: "Debug: FP → Clear Backup Buffer"
     icon: mdi:database-remove
     on_press:
@@ -533,8 +441,6 @@ button:
           id(fp_backup_data_str).clear();
           id(dbg_fp_last_result_str) = "buffer cleared";
           ESP_LOGI("fp_backup", "[DEBUG] Backup buffer cleared");
-
-  # ==== SYSTEM ====
 
   - platform: template
     name: "Debug: System → Reboot"

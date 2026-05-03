@@ -160,7 +160,8 @@ key_collector:
               - api.connected:
               - lambda: 'return id(debug_mode_enabled);'
           then:
-            - script.execute: led_brightness_boost
+            - script.stop: keypad_led_result
+            - script.stop: keypad_led_flash
             - if:
                 condition:
                   lambda: "return !id(keypad_active);"
@@ -173,6 +174,7 @@ key_collector:
                       id(saved_bri) = v.get_brightness();
                       id(saved_on)  = v.is_on();
                       id(keypad_active) = true;
+            - script.execute: led_brightness_boost
             - script.execute:
                 id: keypad_led_progress
                 count: !lambda "return (int)x.size();"

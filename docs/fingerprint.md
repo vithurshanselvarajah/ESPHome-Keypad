@@ -113,14 +113,14 @@ Fired when enrollment fails (scans too inconsistent, sensor error, etc.).
 
 ## Sensors (HA Entities)
 
-Two sensors are exposed as HA numeric entities under the device.
+The `fingerprint_grow` component automatically exposes two numeric sensors under the device in HA.
 
-| Entity | ID | Description |
-|---|---|---|
-| Fingerprint Count | `fp_count_sensor` | Number of currently enrolled fingerprints |
-| Fingerprint Capacity | `fp_capacity_sensor` | Maximum slots (200 for R503) |
+| Entity | Description |
+|---|---|
+| Fingerprint Count | Number of currently enrolled fingerprints |
+| Fingerprint Capacity | Maximum slots (200 for R503) |
 
-`fp_count_sensor` and `fp_capacity_sensor` are used internally by the backup/restore logic and the debug panel.
+`fingerprint_sensor.update()` is called after a successful restore to refresh the enrolled count.
 
 ---
 

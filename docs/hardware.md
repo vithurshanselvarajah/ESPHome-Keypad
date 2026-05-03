@@ -1,5 +1,7 @@
 # Hardware & Wiring
 
+The PCB and enclosure design for this project is from this project - **[sb-ocr/esphome-keypad](https://github.com/sb-ocr/esphome-keypad)**.
+
 ## Components
 
 | Component | Part / Spec |
