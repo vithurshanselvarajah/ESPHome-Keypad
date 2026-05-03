@@ -1,0 +1,151 @@
+name: Release
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+  models: read
+
+jobs:
+  release:
+    name: Tag, build and release
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.head_commit.message, 'release:')
+
+    steps:
+      - name: Checkout (full history for changelog diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read and validate VERSION
+        id: version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::VERSION contains '$VERSION' — must be semver e.g. 1.2.3"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION"    >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION (tag: v$VERSION)"
+
+      - name: Check tag does not already exist
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists. Bump the version in VERSION and commit again."
+            exit 1
+          fi
+
+      - name: Extract commit subject and body
+        run: |
+          git log -1 --pretty=format:%s > /tmp/commit_subject.txt
+          git log -1 --pretty=format:%b > /tmp/commit_body.txt
+          echo "Subject : $(cat /tmp/commit_subject.txt)"
+          echo "Body    : $(wc -c < /tmp/commit_body.txt) chars"
+
+      - name: Find previous release tag
+        id: prev_tag
+        run: |
+          PREV=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "ref=$PREV" >> "$GITHUB_OUTPUT"
+          [ -n "$PREV" ] && echo "Previous tag: $PREV" || echo "No previous tags — first release"
+
+      - name: Generate changelog (AI)
+        run: |
+          python scripts/generate_changelog.py \
+            --version          "${{ steps.version.outputs.version }}" \
+            --from-ref         "${{ steps.prev_tag.outputs.ref }}" \
+            --commit-subject   "$(cat /tmp/commit_subject.txt)" \
+            --commit-body-file /tmp/commit_body.txt \
+            --output           /tmp/changelog.md \
+            --repo-path        .
+          echo "--- Changelog preview (first 30 lines) ---"
+          head -30 /tmp/changelog.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Persist main refs in keypad.yaml
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("keypad.yaml")
+          text = path.read_text(encoding="utf-8")
+          updated = text.replace("ref: develop", "ref: main")
+          if updated != text:
+            path.write_text(updated, encoding="utf-8")
+            print("keypad.yaml updated: ref develop -> main")
+          else:
+            print("keypad.yaml already using main refs")
+          PY
+
+          if ! git diff --quiet -- keypad.yaml; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add keypad.yaml
+            git commit -m "chore(release): set keypad refs to main"
+            git push origin HEAD:main
+          fi
+
+      - name: Sync workspace to latest main
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-esphome
+          restore-keys: ${{ runner.os }}-pip-esphome
+
+      - name: Install ESPHome
+        run: pip install --upgrade esphome
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-${{ hashFiles('keypad.yaml', 'keypad/**/*.yaml', 'keypad/include/**') }}
+          restore-keys: ${{ runner.os }}-pio-
+
+      - name: Generate CI secrets
+        run: python tests/generate_test_secrets.py
+
+      - name: Compile firmware
+        run: esphome compile keypad.yaml
+
+      - name: Prepare firmware binary
+        run: |
+          VERSION="v${{ steps.version.outputs.version }}"
+          cp \
+            .esphome/build/esphome-keypad/.pioenvs/esphome-keypad/firmware.bin \
+            "firmware-${VERSION}.bin"
+          echo "FIRMWARE=firmware-${VERSION}.bin" >> "$GITHUB_ENV"
+
+      - name: Create and push tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" \
+                  -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub release
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            "${{ env.FIRMWARE }}" \
+            --title      "Release v${{ steps.version.outputs.version }}" \
+            --notes-file /tmp/changelog.md \
+            --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}

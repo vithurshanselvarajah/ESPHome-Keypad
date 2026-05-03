@@ -1,0 +1,32 @@
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+  on_boot:
+    priority: -100
+    then:
+      - if:
+          condition:
+            lambda: "return id(debug_mode_enabled);"
+          then:
+            - light.turn_on:
+                id: status_light
+                brightness: 50%
+                red: 100%
+                green: 100%
+                blue: 100%
+                transition_length: 0ms
+
+globals:
+  - id: debug_mode_enabled
+    type: bool
+    restore_value: no
+    initial_value: "${debug_mode}"
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+logger:
+  level: ${log_level}

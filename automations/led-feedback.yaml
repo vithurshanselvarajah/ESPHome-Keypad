@@ -1,0 +1,111 @@
+# LED Feedback Automations
+#
+# The keypad flashes blue 3× after PIN submission and waits 2 seconds for
+# HA to call set_led_colour.  If the action arrives within that window the
+# LED shows the HA colour; if not it reverts to the pre-entry colour.
+#
+# Use these automations to give green/red access feedback via the LED.
+# They pair with pin-access.yaml and fingerprint-access.yaml —
+# call set_led_colour BEFORE the delay in those files, or trigger
+# independently on the same event.
+#
+# MULTI-KEYPAD:
+#   Each block is scoped to one keypad via trigger.event.origin.
+#   Duplicate the block for each additional keypad.
+
+automation:
+  # ----------------------------------------------------------------
+  # Front door — LED feedback on keypad_code_entered result
+  # (fires in parallel with pin-access.yaml)
+  # ----------------------------------------------------------------
+  - alias: "Keypad LED: Front Door — Access granted (green)"
+    id: keypad_led_front_door_granted
+    trigger:
+      - platform: event
+        event_type: esphome.keypad_code_entered
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.origin == 'esphome-front-door' }}"
+      # Only signal green if the code is actually correct
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.code == states('input_text.front_door_pin') }}
+    action:
+      - service: esphome.esphome_front_door_set_led_colour
+        data:
+          hex: "00FF00"
+          brightness: 100
+      - delay: "00:00:05"
+      - service: esphome.esphome_front_door_set_led_colour
+        data:
+          hex: "FFFFFF"
+          brightness: "{{ states('number.front_door_led_brightness') | int }}"
+
+  - alias: "Keypad LED: Front Door — Access denied (red)"
+    id: keypad_led_front_door_denied
+    trigger:
+      - platform: event
+        event_type: esphome.keypad_code_entered
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.origin == 'esphome-front-door' }}"
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.code != states('input_text.front_door_pin') }}
+    action:
+      - service: esphome.esphome_front_door_set_led_colour
+        data:
+          hex: "FF0000"
+          brightness: 100
+      - delay: "00:00:03"
+      - service: esphome.esphome_front_door_set_led_colour
+        data:
+          hex: "FFFFFF"
+          brightness: "{{ states('number.front_door_led_brightness') | int }}"
+
+  # ----------------------------------------------------------------
+  # Garage — LED feedback
+  # ----------------------------------------------------------------
+  - alias: "Keypad LED: Garage — Access granted (green)"
+    id: keypad_led_garage_granted
+    trigger:
+      - platform: event
+        event_type: esphome.keypad_code_entered
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.origin == 'esphome-garage' }}"
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.code == states('input_text.garage_pin') }}
+    action:
+      - service: esphome.esphome_garage_set_led_colour
+        data:
+          hex: "00FF00"
+          brightness: 100
+      - delay: "00:00:05"
+      - service: esphome.esphome_garage_set_led_colour
+        data:
+          hex: "FFFFFF"
+          brightness: "{{ states('number.garage_led_brightness') | int }}"
+
+  - alias: "Keypad LED: Garage — Access denied (red)"
+    id: keypad_led_garage_denied
+    trigger:
+      - platform: event
+        event_type: esphome.keypad_code_entered
+    condition:
+      - condition: template
+        value_template: "{{ trigger.event.origin == 'esphome-garage' }}"
+      - condition: template
+        value_template: >
+          {{ trigger.event.data.code != states('input_text.garage_pin') }}
+    action:
+      - service: esphome.esphome_garage_set_led_colour
+        data:
+          hex: "FF0000"
+          brightness: 100
+      - delay: "00:00:03"
+      - service: esphome.esphome_garage_set_led_colour
+        data:
+          hex: "FFFFFF"
+          brightness: "{{ states('number.garage_led_brightness') | int }}"

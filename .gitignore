@@ -1,0 +1,9 @@
+/.esphome/
+/secrets.yaml
+/build_out.txt
+/venv/
+firmware-*.bin
+__pycache__/
+*.pyc
+.pytest_cache/
+/config

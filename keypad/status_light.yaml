@@ -1,0 +1,67 @@
+globals:
+  - id: led_idle_brightness
+    type: float
+    initial_value: '1.0'
+  - id: led_boost_active
+    type: bool
+    initial_value: 'false'
+
+number:
+  - platform: template
+    id: led_brightness
+    name: "LED Brightness"
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 100
+    restore_value: true
+    unit_of_measurement: "%"
+    optimistic: true
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return !id(led_boost_active);'
+            then:
+              - globals.set:
+                  id: led_idle_brightness
+                  value: !lambda 'return x / 100.0f;'
+        - if:
+            condition:
+              and:
+                - lambda: 'return id(status_light).current_values.is_on();'
+                - lambda: 'return !id(keypad_active);'
+            then:
+              - light.turn_on:
+                  id: status_light
+                  brightness: !lambda 'return x / 100.0f;'
+                  transition_length: 200ms
+
+script:
+  - id: led_brightness_boost
+    mode: restart
+    then:
+      - globals.set:
+          id: led_boost_active
+          value: 'true'
+      - number.set:
+          id: led_brightness
+          value: 100
+      - delay: 30s
+      - globals.set:
+          id: led_boost_active
+          value: 'false'
+      - number.set:
+          id: led_brightness
+          value: !lambda 'return id(led_idle_brightness) * 100.0f;'
+
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    chipset: WS2811
+    pin: 21
+    num_leds: 4
+    name: "Status Light"
+    id: status_light
+    restore_mode: ALWAYS_OFF
+

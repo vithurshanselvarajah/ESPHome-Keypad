@@ -1,0 +1,48 @@
+substitutions:
+  device_name: "esphome-keypad"
+  friendly_name: "Keypad"
+
+  wifi_ssid: !secret wifi_ssid
+  wifi_password: !secret wifi_password
+  enable_ipv6: "false"
+
+  api_encryption_key: !secret api_encryption_key
+  ota_password: !secret ota_password
+
+  fp_password: "0x00000000"
+
+  debug_mode: "0"
+  api_reboot_timeout: "60s"
+
+  log_level: "DEBUG"
+
+packages:
+  # ── Local development ─────────────────────────────────────────────────
+  # Uncomment when flashing directly from your workstation and comment
+  # out the active remote block below.
+  # board:        !include keypad/board.yaml
+  # network:      !include keypad/network.yaml
+  # fingerprint:  !include keypad/fingerprint.yaml
+  # keypad:       !include keypad/keypad.yaml
+  # status_light: !include keypad/status_light.yaml
+
+  # ── Remote source ──────────────────────────────────────
+  remote_package:
+    url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
+    ref: develop
+    refresh: 300s
+    files:
+      - keypad/board.yaml
+      - keypad/network.yaml
+      - keypad/fingerprint.yaml
+      - keypad/keypad.yaml
+      - keypad/status_light.yaml
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
+      ref: develop
+      path: components
+    components: [fingerprint_backup]
+    refresh: 300s

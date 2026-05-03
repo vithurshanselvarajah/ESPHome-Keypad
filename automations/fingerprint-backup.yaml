@@ -1,0 +1,139 @@
+# Fingerprint Backup & Restore Automations
+#
+# BACKUP FLOW:
+#   1. Wake the target sensor (place a finger, or ensure it scanned recently).
+#   2. Call fingerprint_backup_slot — the device fires fingerprint_backup_data.
+#   3. The automation below captures the event and stores it in an input_text helper.
+#   4. That stored value can later be restored to one or all keypads.
+#
+# RESTORE FLOW:
+#   1. Wake the target sensor on the destination keypad.
+#   2. Call fingerprint_restore_slot with the stored data.
+#   3. The slot is written to the sensor's flash; Fingerprint Count updates.
+#
+# MULTI-KEYPAD / CROSS-RESTORE:
+#   The "restore to all keypads" automation sends the same base64 template
+#   to every keypad in your installation. This means one person's fingerprint
+#   works on every door — enroll once, deploy everywhere.
+#
+# DATA STORAGE:
+#   Templates are ~684 base64 characters. Store per-slot in input_text helpers
+#   with max: 1024. For more than ~10 slots consider a file sensor or AppDaemon.
+#
+# PREREQUISITES:
+#   - The target sensor must be awake (scanned in the last 300s) for backup/restore.
+#   - Create input_text helpers for each slot you want to back up (see bottom of file).
+
+automation:
+  # ----------------------------------------------------------------
+  # Capture backup data event → store in input_text helper
+  # Fires for ALL keypads; routes to the correct helper by slot.
+  # ----------------------------------------------------------------
+  - alias: "Fingerprint: Capture backup data from any keypad"
+    id: fingerprint_capture_backup
+    trigger:
+      - platform: event
+        event_type: esphome.fingerprint_backup_data
+    variables:
+      slot: "{{ trigger.event.data.slot }}"
+      data: "{{ trigger.event.data.data }}"
+      helper: "input_text.fp_backup_slot_{{ slot }}"
+    action:
+      # Store the template in a per-slot helper
+      - service: input_text.set_value
+        target:
+          entity_id: "{{ helper }}"
+        data:
+          value: "{{ data }}"
+      - service: notify.mobile_app_phone
+        data:
+          title: "Fingerprint Backup"
+          message: >
+            Slot {{ slot }} backed up from {{ trigger.event.origin }}
+            ({{ data | length }} chars). Stored in {{ helper }}.
+
+  # ----------------------------------------------------------------
+  # Backup a specific slot from a specific keypad
+  # Trigger this via Developer Tools → Actions, or a script/button.
+  # Change slot and device name as needed.
+  # ----------------------------------------------------------------
+  # To trigger manually:
+  #   service: esphome.esphome_front_door_fingerprint_backup_slot
+  #   data:
+  #     slot: 1
+  # Then the automation above captures the result.
+
+  # ----------------------------------------------------------------
+  # Restore slot N to ALL keypads in the installation
+  # Useful for: new keypad install, sensor replacement, mass enrollment.
+  # The same template works on any R503 sensor.
+  # ----------------------------------------------------------------
+  - alias: "Fingerprint: Restore slot to ALL keypads"
+    id: fingerprint_restore_all_keypads
+    # Trigger this via a script, button helper, or Developer Tools.
+    # It reads the stored backup from input_text and pushes it to every keypad.
+    trigger:
+      - platform: event
+        event_type: keypad.restore_slot_to_all
+        # Fire this event from Developer Tools:
+        #   event_type: keypad.restore_slot_to_all
+        #   event_data:
+        #     slot: 1
+    variables:
+      slot: "{{ trigger.event.data.slot }}"
+      data: "{{ states('input_text.fp_backup_slot_' ~ slot) }}"
+    condition:
+      - condition: template
+        value_template: "{{ data | length > 0 }}"
+    action:
+      # Wake all sensors (place a finger on each, or trigger via a timed sequence)
+      # Then restore the template to each keypad:
+      - service: esphome.esphome_front_door_fingerprint_restore_slot
+        data:
+          slot: "{{ slot | int }}"
+          data: "{{ data }}"
+      - delay: "00:00:02"   # give each device time to process
+      - service: esphome.esphome_garage_fingerprint_restore_slot
+        data:
+          slot: "{{ slot | int }}"
+          data: "{{ data }}"
+      # Add more keypads here following the same pattern
+      - service: notify.mobile_app_phone
+        data:
+          title: "Fingerprint Restore"
+          message: "Slot {{ slot }} restored to all keypads."
+
+# ----------------------------------------------------------------
+# Backup ALL enrolled slots from a specific keypad
+# Useful before replacing a sensor.
+# ----------------------------------------------------------------
+# To trigger: call the debug button "Backup All Enrolled Slots" from the
+# device web UI (debug mode), or fire one backup per slot via a script:
+#
+# script:
+#   backup_all_front_door:
+#     sequence:
+#       - repeat:
+#           count: "{{ states('sensor.front_door_fingerprint_count') | int }}"
+#           sequence:
+#             - service: esphome.esphome_front_door_fingerprint_backup_slot
+#               data:
+#                 slot: "{{ repeat.index }}"
+#             - delay: "00:00:02"
+
+# ----------------------------------------------------------------
+# Input helpers — one per slot, max 1024 chars for full template.
+# Add to configuration.yaml or a helpers package file.
+# Create as many as your maximum slot count (up to 200).
+# ----------------------------------------------------------------
+# input_text:
+#   fp_backup_slot_1:
+#     name: "FP Backup: Slot 1"
+#     max: 1024
+#   fp_backup_slot_2:
+#     name: "FP Backup: Slot 2"
+#     max: 1024
+#   fp_backup_slot_3:
+#     name: "FP Backup: Slot 3"
+#     max: 1024
+#   # ... continue for each slot you use

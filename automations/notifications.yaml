@@ -1,0 +1,93 @@
+# Notification Automations
+#
+# Push notifications for access events across all keypads.
+# All automations listen to all keypads simultaneously — the keypad name
+# is included in the message via trigger.event.origin.
+#
+# Replace notify.mobile_app_phone with your actual notify target(s).
+
+automation:
+  # ----------------------------------------------------------------
+  # Notify on PIN access — any keypad
+  # ----------------------------------------------------------------
+  - alias: "Notify: PIN submitted on any keypad"
+    id: notify_pin_submitted
+    trigger:
+      - platform: event
+        event_type: esphome.keypad_code_entered
+    variables:
+      keypad: "{{ trigger.event.origin | replace('esphome-', '') | replace('-', ' ') | title }}"
+      code: "{{ trigger.event.data.code }}"
+    action:
+      - service: notify.mobile_app_phone
+        data:
+          title: "Keypad — {{ keypad }}"
+          message: "PIN submitted"
+          # Do NOT log the code value in notifications for security
+
+  # ----------------------------------------------------------------
+  # Notify on fingerprint match — any keypad
+  # ----------------------------------------------------------------
+  - alias: "Notify: Fingerprint matched on any keypad"
+    id: notify_fingerprint_matched
+    trigger:
+      - platform: event
+        event_type: esphome.fingerprint_authenticated
+    variables:
+      keypad: "{{ trigger.event.origin | replace('esphome-', '') | replace('-', ' ') | title }}"
+      slot: "{{ trigger.event.data.id }}"
+      confidence: "{{ trigger.event.data.confidence }}"
+      person: >
+        {{ states('input_text.fp_slot_' ~ slot ~ '_name') | default('Unknown (slot ' ~ slot ~ ')') }}
+    action:
+      - service: notify.mobile_app_phone
+        data:
+          title: "Keypad — {{ keypad }}"
+          message: "{{ person }} authenticated (confidence {{ confidence }})"
+
+  # ----------------------------------------------------------------
+  # Notify on repeated failed PINs (brute-force detection)
+  # ----------------------------------------------------------------
+  - alias: "Notify: Repeated wrong PINs (possible brute force)"
+    id: notify_pin_brute_force
+    trigger:
+      - platform: event
+        event_type: esphome.keypad_code_entered
+    variables:
+      entered_code: "{{ trigger.event.data.code }}"
+      keypad: "{{ trigger.event.origin }}"
+    condition:
+      # Only count wrong PINs
+      - condition: template
+        value_template: >
+          {{ entered_code != states('input_text.front_door_pin')
+             and entered_code != states('input_text.garage_pin') }}
+    action:
+      - service: counter.increment
+        target:
+          entity_id: counter.keypad_wrong_pin
+      - if:
+          - condition: numeric_state
+            entity_id: counter.keypad_wrong_pin
+            above: 4
+        then:
+          - service: notify.mobile_app_phone
+            data:
+              title: "⚠ Security Alert"
+              message: >
+                {{ states('counter.keypad_wrong_pin') }} wrong PINs
+                entered at {{ keypad | replace('esphome-', '') }}.
+          - service: counter.reset
+            target:
+              entity_id: counter.keypad_wrong_pin
+
+# ----------------------------------------------------------------
+# Counter helper for brute-force detection.
+# Add to configuration.yaml or a helpers package file.
+# ----------------------------------------------------------------
+# counter:
+#   keypad_wrong_pin:
+#     name: "Keypad Wrong PIN Count"
+#     initial: 0
+#     step: 1
+#     restore: false

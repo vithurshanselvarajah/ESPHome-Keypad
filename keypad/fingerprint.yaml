@@ -1,0 +1,130 @@
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: fp_aura_idle
+
+fingerprint_backup: {}
+
+uart:
+  id: uart_fingerprint
+  tx_pin: GPIO17
+  rx_pin: GPIO18
+  baud_rate: 57600
+
+fingerprint_grow:
+  id: fingerprint_sensor
+  uart_id: uart_fingerprint
+  password: ${fp_password}
+  sensing_pin:
+    number: 48
+    mode:
+      input: true
+      pulldown: true
+  sensor_power_pin:
+    number: 47
+    inverted: true
+  idle_period_to_sleep: 300s
+
+  on_finger_scan_matched:
+    - script.execute: led_brightness_boost
+    - fingerprint_grow.aura_led_control:
+        state: BREATHING
+        speed: 200
+        color: GREEN
+        count: 1
+    - if:
+        condition:
+          or:
+            - api.connected:
+            - lambda: 'return id(debug_mode_enabled);'
+        then:
+          - homeassistant.event:
+              event: esphome.fingerprint_authenticated
+              data:
+                id: !lambda "return finger_id;"
+                confidence: !lambda "return confidence;"
+    - script.execute: fp_aura_restore
+
+  on_finger_scan_unmatched:
+    - script.execute: led_brightness_boost
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 30
+        color: RED
+        count: 4
+    - script.execute: fp_aura_restore
+
+  on_finger_scan_misplaced:
+    - script.execute: led_brightness_boost
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: PURPLE
+        count: 2
+    - script.execute: fp_aura_restore
+
+  on_enrollment_scan:
+    - script.execute: led_brightness_boost
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: BLUE
+        count: 2
+    - delay: 1s
+    - fingerprint_grow.aura_led_control:
+        state: ALWAYS_ON
+        speed: 0
+        color: PURPLE
+        count: 0
+  on_enrollment_done:
+    - fingerprint_grow.aura_led_control:
+        state: BREATHING
+        speed: 100
+        color: BLUE
+        count: 2
+    - script.execute: fp_aura_restore
+
+  on_enrollment_failed:
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: RED
+        count: 4
+    - script.execute: fp_aura_restore
+
+  on_finger_scan_invalid:
+    - script.execute: led_brightness_boost
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: RED
+        count: 2
+    - script.execute: fp_aura_restore
+
+script:
+
+  - id: fp_aura_idle
+    then:
+      - fingerprint_grow.aura_led_control:
+          state: BREATHING
+          speed: 40
+          color: BLUE
+          count: 0
+
+  - id: fp_aura_restore
+    mode: restart
+    then:
+      - delay: 3s
+      - script.execute: fp_aura_idle
+
+  - id: fp_sensor_wake_impl
+    then:
+      - lambda: 'gpio_set_level(GPIO_NUM_47, 1);'
+      - delay: 300ms
+      - lambda: 'gpio_set_level(GPIO_NUM_47, 0);'
+      - delay: 2s
+      - script.execute: fp_aura_idle
+
+sensor:
+

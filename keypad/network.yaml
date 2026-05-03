@@ -1,0 +1,145 @@
+globals:
+  - id: fp_backup_data_str
+    type: std::string
+    restore_value: no
+
+network:
+  enable_ipv6: ${enable_ipv6}
+
+wifi:
+  ssid: ${wifi_ssid}
+  password: ${wifi_password}
+
+api:
+  reboot_timeout: ${api_reboot_timeout}
+  encryption:
+    key: ${api_encryption_key}
+
+  actions:
+    - action: fingerprint_enroll
+      variables:
+        slot: int
+        num_scans: int
+      then:
+        - script.execute: fp_sensor_wake_impl
+        - script.wait: fp_sensor_wake_impl
+        - fingerprint_grow.enroll:
+            finger_id: !lambda "return slot;"
+            num_scans: !lambda "return num_scans;"
+
+    - action: fingerprint_cancel_enroll
+      then:
+        - fingerprint_grow.cancel_enroll:
+
+    - action: fingerprint_delete
+      variables:
+        slot: int
+      then:
+        - script.execute: fp_sensor_wake_impl
+        - script.wait: fp_sensor_wake_impl
+        - fingerprint_grow.delete:
+            finger_id: !lambda "return slot;"
+
+    - action: fingerprint_delete_all
+      then:
+        - script.execute: fp_sensor_wake_impl
+        - script.wait: fp_sensor_wake_impl
+        - fingerprint_grow.delete_all:
+
+    - action: fingerprint_sensor_wake
+      then:
+        - script.execute: fp_sensor_wake_impl
+        - script.wait: fp_sensor_wake_impl
+
+    - action: fingerprint_backup_slot
+      variables:
+        slot: int
+      then:
+        - script.execute: fp_sensor_wake_impl
+        - script.wait: fp_sensor_wake_impl
+        - lambda: |-
+            id(fp_backup_data_str).clear();
+            std::string result = fp_backup::backup_slot(id(uart_fingerprint), slot);
+            if (!result.empty()) id(fp_backup_data_str) = result;
+        - if:
+            condition:
+              lambda: "return !id(fp_backup_data_str).empty();"
+            then:
+              - homeassistant.event:
+                  event: esphome.fingerprint_backup_data
+                  data:
+                    slot: !lambda "return to_string(slot);"
+                    data: !lambda "return id(fp_backup_data_str);"
+
+    - action: set_led_colour
+      variables:
+        hex: string
+        brightness: int
+      then:
+        - lambda: |-
+            std::string h = hex;
+            for (auto &c : h) c = tolower(c);
+            if (h == "off") {
+              id(status_light).turn_off().perform();
+              id(saved_on) = false;
+              return;
+            }
+            if (!h.empty() && h[0] == '#') h = h.substr(1);
+            if (h.size() != 6) {
+              ESP_LOGW("set_led_colour", "Invalid hex colour: %s", hex.c_str());
+              return;
+            }
+            int ri = strtol(h.substr(0, 2).c_str(), nullptr, 16);
+            int gi = strtol(h.substr(2, 2).c_str(), nullptr, 16);
+            int bi = strtol(h.substr(4, 2).c_str(), nullptr, 16);
+            if (brightness >= 1 && brightness <= 100)
+              id(led_idle_brightness) = brightness / 100.0f;
+            float bri = id(led_idle_brightness);
+            float rf = ri / 255.0f, gf = gi / 255.0f, bf = bi / 255.0f;
+            id(saved_r) = rf; id(saved_g) = gf; id(saved_b) = bf;
+            id(saved_bri) = bri; id(saved_on) = true;
+            if (id(keypad_active)) return;
+            auto call = id(status_light).turn_on();
+            call.set_red(rf); call.set_green(gf); call.set_blue(bf);
+            call.set_brightness(bri);
+            call.set_transition_length(500);
+            call.perform();
+        - if:
+            condition:
+              lambda: 'return brightness >= 1 && brightness <= 100 && !id(led_boost_active) && !id(keypad_active);'
+            then:
+              - number.set:
+                  id: led_brightness
+                  value: !lambda 'return (float)brightness;'
+
+    - action: fingerprint_restore_slot
+      variables:
+        slot: int
+        data: string
+      then:
+        - script.execute: fp_sensor_wake_impl
+        - script.wait: fp_sensor_wake_impl
+        - lambda: |-
+            if (!fp_backup::restore_slot(id(uart_fingerprint), slot, data)) {
+              ESP_LOGW("fp_backup", "Restore to slot %d failed (sensor asleep or bad data)", slot);
+              return;
+            }
+            id(fingerprint_sensor).update();
+
+  on_client_connected:
+    - if:
+        condition:
+          lambda: "return !id(debug_mode_enabled);"
+        then:
+          - light.turn_on:
+              id: status_light
+              brightness: !lambda 'return id(led_idle_brightness);'
+              red: 100%
+              green: 100%
+              blue: 100%
+              transition_length: 500ms
+
+ota:
+  - platform: esphome
+    password: ${ota_password}
+
