@@ -20,11 +20,12 @@ packages:
   # ── Local development ─────────────────────────────────────────────────
   # Uncomment when flashing directly from your workstation and comment
   # out the active remote block below.
-  # board:        !include keypad/board.yaml
-  # network:      !include keypad/network.yaml
-  # fingerprint:  !include keypad/fingerprint.yaml
-  # keypad:       !include keypad/keypad.yaml
-  # status_light: !include keypad/status_light.yaml
+#   board:        !include keypad/board.yaml
+#   network:      !include keypad/network.yaml
+#   fingerprint:  !include keypad/fingerprint.yaml
+#   keypad:       !include keypad/keypad.yaml
+#   status_light: !include keypad/status_light.yaml
+#   debug:        !include keypad/debug.yaml
 
   # ── Remote source ──────────────────────────────────────
   remote_package:
@@ -39,10 +40,17 @@ packages:
       - keypad/status_light.yaml
 
 external_components:
-  - source:
-      type: git
-      url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
-      ref: main
-      path: components
-    components: [fingerprint_backup]
-    refresh: 300s
+  # Local development source (active)
+#  - source:
+#      type: local
+#      path: components
+#    components: [fingerprint_backup]
+
+   Remote source (optional)
+   - source:
+       type: git
+       url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
+       ref: main
+       path: components
+     components: [fingerprint_backup]
+     refresh: 300s

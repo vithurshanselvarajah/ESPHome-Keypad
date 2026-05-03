@@ -167,18 +167,6 @@ text_sensor:
     lambda: 'return id(dbg_fp_last_result_str);'
     update_interval: 2s
 
-  - platform: template
-    name: "Debug: FP Sensor Capacity"
-    id: dbg_fp_cap
-    update_interval: 5s
-    icon: mdi:counter
-    lambda: |-
-      char buf[32];
-      snprintf(buf, sizeof(buf), "%d enrolled / %d slots",
-               (int)round(id(fp_count_sensor).state),
-               (int)round(id(fp_capacity_sensor).state));
-      return std::string(buf);
-
 # ---- Switches -------------------------------------------
 
 # ---- LED digit progress slider + FP slot selector ------
@@ -496,34 +484,6 @@ button:
           id(dbg_fp_last_result_str) = std::string(ok ? "OK" : "FAIL") + ": restore → slot " + to_string(slot);
           ESP_LOGI("fp_backup", "[DEBUG] Restore → slot %d: %s", slot, ok ? "OK" : "FAILED");
           if (ok) id(fingerprint_sensor).update();
-
-  - platform: template
-    name: "Debug: FP → Backup All Enrolled Slots"
-    icon: mdi:database-export
-    on_press:
-      - lambda: |-
-          int count    = (int)round(id(fp_count_sensor).state);
-          int capacity = (int)round(id(fp_capacity_sensor).state);
-          if (count == 0) {
-            id(dbg_fp_last_result_str) = "FAIL: no fingerprints enrolled";
-            ESP_LOGW("fp_backup", "[DEBUG] Backup all: no enrolled fingerprints");
-            return;
-          }
-          int ok_count = 0, fail_count = 0;
-          for (int s = 1; s <= capacity; s++) {
-            std::string result = fp_backup::backup_slot(id(uart_fingerprint), s);
-            if (result.empty()) {
-              // Empty result = slot not enrolled or timeout; skip silently
-              continue;
-            }
-            ok_count++;
-            ESP_LOGI("fp_backup", "[DEBUG] Backup all: slot %d OK (%u chars)", s, (unsigned)result.size());
-            // Keep last successful result in buffer so it can be restored
-            id(fp_backup_data_str) = result;
-          }
-          if (ok_count == 0) fail_count = count;
-          id(dbg_fp_last_result_str) = "Backup all: " + to_string(ok_count) + " OK / " + to_string(capacity) + " slots checked (see logs)";
-          ESP_LOGI("fp_backup", "[DEBUG] Backup all complete: %d OK", ok_count);
 
   - platform: template
     name: "Debug: FP → Clear Backup Buffer"
