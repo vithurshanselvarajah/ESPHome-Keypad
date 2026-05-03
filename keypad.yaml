@@ -29,7 +29,7 @@ packages:
   # ── Remote source ──────────────────────────────────────
   remote_package:
     url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
-    ref: develop
+    ref: main
     refresh: 300s
     files:
       - keypad/board.yaml
@@ -42,7 +42,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/vithurshanselvarajah/ESPHome-Keypad
-      ref: develop
+      ref: main
       path: components
     components: [fingerprint_backup]
     refresh: 300s
