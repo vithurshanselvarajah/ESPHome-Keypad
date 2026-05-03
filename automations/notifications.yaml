@@ -1,83 +1,54 @@
-# Notification Automations
+# Notification — Keypad Activity
 #
-# Push notifications for access events across all keypads.
-# All automations listen to all keypads simultaneously — the keypad name
-# is included in the message via trigger.event.origin.
+# HOW TO USE:
+#   Settings → Automations → New Automation → 3-dot menu → Edit in YAML
+#   Paste this block. Replace the values marked REPLACE.
 #
-# Replace notify.mobile_app_phone with your actual notify target(s).
+# Sends a push notification whenever a PIN is entered or a fingerprint
+# is authenticated on the keypad. The alarm state change itself is
+# handled by pin-access.yaml / fingerprint-access.yaml.
+#
+# REPLACE:
+#   - REPLACE_KEYPAD_DEVICE_ID  → your device_id from event data
+#   - notify.mobile_app_your_phone  → your actual notify target
+#
+# Tip: to notify on BOTH PIN and fingerprint events you can add a
+# second trigger block with event_type: esphome.fingerprint_authenticated.
 
-automation:
-  # ----------------------------------------------------------------
-  # Notify on PIN access — any keypad
-  # ----------------------------------------------------------------
-  - alias: "Notify: PIN submitted on any keypad"
-    id: notify_pin_submitted
-    trigger:
-      - platform: event
-        event_type: esphome.keypad_code_entered
-    variables:
-      keypad: "{{ trigger.event.origin | replace('esphome-', '') | replace('-', ' ') | title }}"
-      code: "{{ trigger.event.data.code }}"
-    action:
-      - service: notify.mobile_app_phone
-        data:
-          title: "Keypad — {{ keypad }}"
-          message: "PIN submitted"
-          # Do NOT log the code value in notifications for security
-
-  # ----------------------------------------------------------------
-  # Notify on fingerprint match — any keypad
-  # ----------------------------------------------------------------
-  - alias: "Notify: Fingerprint matched on any keypad"
-    id: notify_fingerprint_matched
-    trigger:
-      - platform: event
-        event_type: esphome.fingerprint_authenticated
-    variables:
-      keypad: "{{ trigger.event.origin | replace('esphome-', '') | replace('-', ' ') | title }}"
-      slot: "{{ trigger.event.data.id }}"
-      confidence: "{{ trigger.event.data.confidence }}"
-      person: >
-        {{ states('input_text.fp_slot_' ~ slot ~ '_name') | default('Unknown (slot ' ~ slot ~ ')') }}
-    action:
-      - service: notify.mobile_app_phone
-        data:
-          title: "Keypad — {{ keypad }}"
-          message: "{{ person }} authenticated (confidence {{ confidence }})"
-
-  # ----------------------------------------------------------------
-  # Notify on repeated failed PINs (brute-force detection)
-  # ----------------------------------------------------------------
-  - alias: "Notify: Repeated wrong PINs (possible brute force)"
-    id: notify_pin_brute_force
-    trigger:
-      - platform: event
-        event_type: esphome.keypad_code_entered
-    variables:
-      entered_code: "{{ trigger.event.data.code }}"
-      keypad: "{{ trigger.event.origin }}"
-    condition:
-      # Only count wrong PINs
-      - condition: template
-        value_template: >
-          {{ entered_code != states('input_text.front_door_pin')
-             and entered_code != states('input_text.garage_pin') }}
-    action:
-      - service: counter.increment
-        target:
-          entity_id: counter.keypad_wrong_pin
-      - if:
-          - condition: numeric_state
-            entity_id: counter.keypad_wrong_pin
-            above: 4
-        then:
-          - service: notify.mobile_app_phone
+alias: "Notify: Keypad activity"
+description: Push notification on PIN entry or fingerprint authentication.
+triggers:
+  - trigger: event
+    event_type: esphome.keypad_code_entered
+    event_data:
+      device_id: REPLACE_KEYPAD_DEVICE_ID
+  - trigger: event
+    event_type: esphome.fingerprint_authenticated
+    event_data:
+      device_id: REPLACE_KEYPAD_DEVICE_ID
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.event_type == 'esphome.keypad_code_entered' }}"
+        sequence:
+          - action: notify.mobile_app_your_phone
             data:
-              title: "⚠ Security Alert"
+              title: "Keypad"
+              message: "PIN submitted"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.event_type == 'esphome.fingerprint_authenticated' }}"
+        sequence:
+          - action: notify.mobile_app_your_phone
+            data:
+              title: "Keypad"
               message: >
-                {{ states('counter.keypad_wrong_pin') }} wrong PINs
-                entered at {{ keypad | replace('esphome-', '') }}.
-          - service: counter.reset
+                Fingerprint authenticated (slot {{ trigger.event.data.id }},
+                confidence {{ trigger.event.data.confidence }})
+mode: queued
+max: 5
             target:
               entity_id: counter.keypad_wrong_pin
 

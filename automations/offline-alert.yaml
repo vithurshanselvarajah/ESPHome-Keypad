@@ -1,71 +1,32 @@
-# Offline Alert Automations
+# Offline Alert
 #
-# Alerts when a keypad loses connectivity with Home Assistant.
-# Uses the ESPHome API connection status (binary_sensor created automatically
-# by HA when you add the ESPHome device).
+# HOW TO USE:
+#   Settings → Automations → New Automation → 3-dot menu → Edit in YAML
+#   Paste this block. Replace the values marked REPLACE.
 #
-# Entity IDs follow the pattern:
-#   binary_sensor.<device_name>_connected
-# where device_name matches the `device_name` substitution in keypad.yaml
-# (with hyphens replaced by underscores).
+# Sends a push notification if the keypad goes offline for more than
+# 1 minute. HA creates a binary_sensor.DEVICE_connected entity
+# automatically when you add an ESPHome device.
 #
-# MULTI-KEYPAD:
-#   Add every keypad's connected sensor to the trigger entity list.
+# REPLACE:
+#   - binary_sensor.REPLACE_DEVICE_connected
+#     → e.g. binary_sensor.esphome_keypad_58066c_connected
+#   - notify.mobile_app_your_phone  → your actual notify target
 
-automation:
-  # ----------------------------------------------------------------
-  # Alert when any keypad goes offline
-  # ----------------------------------------------------------------
-  - alias: "Keypad: Offline alert"
-    id: keypad_offline_alert
-    trigger:
-      - platform: state
-        entity_id:
-          - binary_sensor.esphome_front_door_connected
-          - binary_sensor.esphome_garage_connected
-          # Add more keypads here
-        to: "off"
-        for: "00:01:00"   # only alert if offline for more than 1 minute
-    variables:
-      keypad: >
-        {{ trigger.to_state.attributes.friendly_name
-           | default(trigger.entity_id | replace('binary_sensor.', '')
-                     | replace('_connected', '') | replace('_', ' ') | title) }}
-    action:
-      - service: notify.mobile_app_phone
-        data:
-          title: "⚠ Keypad Offline"
-          message: "{{ keypad }} has lost connection to Home Assistant."
-
-  # ----------------------------------------------------------------
-  # Notify when a keypad comes back online
-  # ----------------------------------------------------------------
-  - alias: "Keypad: Back online"
-    id: keypad_back_online
-    trigger:
-      - platform: state
-        entity_id:
-          - binary_sensor.esphome_front_door_connected
-          - binary_sensor.esphome_garage_connected
-        to: "on"
-        from: "off"
-    variables:
-      keypad: >
-        {{ trigger.to_state.attributes.friendly_name
-           | default(trigger.entity_id | replace('binary_sensor.', '')
-                     | replace('_connected', '') | replace('_', ' ') | title) }}
-    action:
-      - service: notify.mobile_app_phone
-        data:
-          title: "✓ Keypad Online"
-          message: "{{ keypad }} has reconnected to Home Assistant."
-      # Restore LED colour after reconnect
-      - service: "esphome.{{ trigger.entity_id | replace('binary_sensor.', '')
-                              | replace('_connected', '') }}_set_led_colour"
-        data:
-          hex: "FFFFFF"
-          brightness: >
-            {{ states('number.' ~ trigger.entity_id
-               | replace('binary_sensor.', '')
-               | replace('_connected', '')
-               ~ '_led_brightness') | int(100) }}
+alias: "Alarm: Keypad offline alert"
+description: Notifies when the keypad loses connection to Home Assistant.
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.REPLACE_DEVICE_connected
+    to: "off"
+    for:
+      minutes: 1
+conditions: []
+actions:
+  - action: notify.mobile_app_your_phone
+    data:
+      title: "⚠ Keypad Offline"
+      message: >
+        The keypad has lost connection to Home Assistant.
+        Check power and Wi-Fi. The alarm cannot be disarmed remotely.
+mode: single
