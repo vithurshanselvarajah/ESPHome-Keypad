@@ -6,10 +6,13 @@ ROOT = Path(__file__).parent.parent
 
 
 def get_secret_refs() -> set[str]:
-    """Return all !secret <key> references found in keypad.yaml and keypad/*.yaml."""
+    """Return all !secret <key> references found in device-*.yaml and keypad/*.yaml."""
     pattern = re.compile(r"!\s*secret\s+(\w+)")
     refs: set[str] = set()
-    candidates = [ROOT / "keypad.yaml"] + list((ROOT / "keypad").glob("*.yaml"))
+    candidates = (
+        [ROOT / "keypad.yaml", ROOT / "keypad-local.yaml"]
+        + list((ROOT / "keypad").glob("*.yaml"))
+    )
     for path in candidates:
         text = path.read_text(encoding="utf-8")
         refs.update(pattern.findall(text))
@@ -80,25 +83,25 @@ def test_secrets_yaml_is_gitignored():
 
 
 def test_keypad_yaml_packages_present():
-    """keypad.yaml must include all required package files."""
+    """keypad.yaml must reference all required package files."""
     keypad_yaml = (ROOT / "keypad.yaml").read_text(encoding="utf-8")
     required_packages = ["board", "network", "fingerprint", "keypad", "status_light"]
     for pkg in required_packages:
         assert pkg in keypad_yaml, (
-            f"keypad.yaml is missing the '{pkg}' package include. "
+            f"keypad.yaml is missing the '{pkg}' package reference. "
             "Check the packages: section."
         )
 
 
 def test_all_included_package_files_exist():
-    """Every !include target in keypad.yaml must point to an existing file."""
-    keypad_yaml = (ROOT / "keypad.yaml").read_text(encoding="utf-8")
+    """Every !include target in keypad-local.yaml must point to an existing file."""
+    keypad_local = (ROOT / "keypad-local.yaml").read_text(encoding="utf-8")
     # Match both   !include path  and  package: !include path
-    includes = re.findall(r"!include\s+([\w/.\-]+\.yaml)", keypad_yaml)
+    includes = re.findall(r"!include\s+([\w/.\-]+\.yaml)", keypad_local)
     for rel_path in includes:
         target = ROOT / rel_path
         assert target.is_file(), (
-            f"keypad.yaml includes '{rel_path}' but that file does not exist."
+            f"keypad-local.yaml includes '{rel_path}' but that file does not exist."
         )
 
 
